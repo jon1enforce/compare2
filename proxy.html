@@ -2,7 +2,7 @@
 <html lang="en">
     <head>
         <meta charset="utf-8">
-        <title>threads.html</title>
+        <title>proxy.html</title>
         <style type="text/css">
           .end-element { fill : #FFCCFF; }
         </style>
@@ -205,42 +205,110 @@ function base64ToSvgDocument(base64) {
         </script>
     </head>
     <body>
-        <div><textarea id="code" style="width: 100%;" rows="11">op2=>operation: 'Threading primitives for the network package'
+        <div><textarea id="code" style="width: 100%;" rows="11">op2=>operation: '\nSet proxy if avaiable otherwise exception\n'
 op4=>operation: import logging
-op6=>operation: import random
-op8=>operation: import threading
-op10=>operation: from contextlib import contextmanager
-op12=>operation: class StoppableThread(threading.Thread):
-    'Base class for application threads with stopThread method'
-    name = None
-    logger = logging.getLogger('default')
+op6=>operation: import socket
+op8=>operation: import time
+op10=>operation: import asyncore_pollchoose as asyncore
+op12=>operation: from advanceddispatcher import AdvancedDispatcher
+op14=>operation: from bmconfigparser import config
+op16=>operation: from node import Peer
+op18=>operation: logger = logging.getLogger('default')
+op20=>operation: class ProxyError(Exception):
+    'Base proxy exception class'
+    errorCodes = ('Unknown error',)
 
-    def __init__(self, name=None):
-        if name:
-            self.name = name
-        super(StoppableThread, self).__init__(name=self.name)
-        self.stop = threading.Event()
-        self._stopped = False
-        random.seed()
-        self.logger.info('Init thread %s', self.name)
+    def __init__(self, code=(- 1)):
+        self.code = code
+        try:
+            self.message = self.errorCodes[code]
+        except IndexError:
+            self.message = self.errorCodes[(- 1)]
+        super(ProxyError, self).__init__(self.message)
+op22=>operation: class GeneralProxyError(ProxyError):
+    'General proxy error class (not specfic to an implementation)'
+    errorCodes = ('Success', 'Invalid data', 'Not connected', 'Not available', 'Bad proxy type', 'Bad input', 'Timed out', 'Network unreachable', 'Connection refused', 'Host unreachable')
+op24=>operation: class Proxy(AdvancedDispatcher):
+    'Base proxy class'
+    _proxy = ('127.0.0.1', 9050)
+    _auth = None
+    _onion_proxy = None
+    _onion_auth = None
+    _remote_dns = True
 
-    def stopThread(self):
-        'Stop the thread'
-        self._stopped = True
-        self.stop.set()
-op14=>operation: class BusyError(threading.ThreadError):
-    '\n    Thread error raised when another connection holds the lock\n    we are trying to acquire.\n    '
-    pass
-st17=>start: start nonBlocking
-io19=>inputoutput: input: lock
-op22=>operation: '\n    A context manager which acquires given lock non-blocking\n    and raises BusyError if failed to acquire.\n    '
-op24=>operation: locked = lock.acquire(False)
-cond27=>operation: raise BusyError if  (not locked)
-op37=>operation: try:
-    (yield)
-finally:
-    lock.release()
-e39=>end: end nonBlocking
+    @property
+    def proxy(self):
+        'Return proxy IP and port'
+        return self.__class__._proxy
+
+    @proxy.setter
+    def proxy(self, address):
+        'Set proxy IP and port'
+        if ((not isinstance(address, tuple)) or (len(address) < 2) or (not isinstance(address[0], str)) or (not isinstance(address[1], int))):
+            raise ValueError
+        self.__class__._proxy = address
+
+    @property
+    def auth(self):
+        'Return proxy authentication settings'
+        return self.__class__._auth
+
+    @auth.setter
+    def auth(self, authTuple):
+        'Set proxy authentication (username and password)'
+        self.__class__._auth = authTuple
+
+    @property
+    def onion_proxy(self):
+        '\n        Return separate proxy IP and port for use only with onion\n        addresses. Untested.\n        '
+        return self.__class__._onion_proxy
+
+    @onion_proxy.setter
+    def onion_proxy(self, address):
+        'Set onion proxy address'
+        if ((address is not None) and ((not isinstance(address, tuple)) or (len(address) < 2) or (not isinstance(address[0], str)) or (not isinstance(address[1], int)))):
+            raise ValueError
+        self.__class__._onion_proxy = address
+
+    @property
+    def onion_auth(self):
+        'Return proxy authentication settings for onion hosts only'
+        return self.__class__._onion_auth
+
+    @onion_auth.setter
+    def onion_auth(self, authTuple):
+        'Set proxy authentication for onion hosts only. Untested.'
+        self.__class__._onion_auth = authTuple
+
+    def __init__(self, address):
+        if (not isinstance(address, Peer)):
+            raise ValueError
+        AdvancedDispatcher.__init__(self)
+        self.destination = address
+        self.isOutbound = True
+        self.fullyEstablished = False
+        self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
+        if config.safeGetBoolean('bitmessagesettings', 'socksauthentication'):
+            self.auth = (config.safeGet('bitmessagesettings', 'socksusername'), config.safeGet('bitmessagesettings', 'sockspassword'))
+        else:
+            self.auth = None
+        self.connect((self.onion_proxy if (address.host.endswith('.onion') and self.onion_proxy) else self.proxy))
+
+    def handle_connect(self):
+        'Handle connection event (to the proxy)'
+        self.set_state('init')
+        try:
+            AdvancedDispatcher.handle_connect(self)
+        except socket.error as e:
+            if (e.errno in asyncore._DISCONNECTED):
+                logger.debug('%s:%i: Connection failed: %s', self.destination.host, self.destination.port, e)
+                return
+        self.state_init()
+
+    def state_proxy_handshake_done(self):
+        'Handshake is complete at this point'
+        self.connectedAt = time.time()
+        return False
 
 op2->op4
 op4->op6
@@ -248,13 +316,11 @@ op6->op8
 op8->op10
 op10->op12
 op12->op14
-op14->st17
-st17->io19
-io19->op22
+op14->op16
+op16->op18
+op18->op20
+op20->op22
 op22->op24
-op24->cond27
-cond27->op37
-op37->e39
 </textarea></div>
         <div><button id="run" type="button">Run</button> <button onclick="HelpText()">Format Help</button></div>
         <div id="HelpTextBlock" style="display:none"><br/>Conditions can also be redirected like cond(yes, bottom) or cond(yes, right)

@@ -2,7 +2,7 @@
 <html lang="en">
     <head>
         <meta charset="utf-8">
-        <title>threads.html</title>
+        <title>udp.html</title>
         <style type="text/css">
           .end-element { fill : #FFCCFF; }
         </style>
@@ -205,42 +205,125 @@ function base64ToSvgDocument(base64) {
         </script>
     </head>
     <body>
-        <div><textarea id="code" style="width: 100%;" rows="11">op2=>operation: 'Threading primitives for the network package'
+        <div><textarea id="code" style="width: 100%;" rows="11">op2=>operation: '\nUDP protocol handler\n'
 op4=>operation: import logging
-op6=>operation: import random
-op8=>operation: import threading
-op10=>operation: from contextlib import contextmanager
-op12=>operation: class StoppableThread(threading.Thread):
-    'Base class for application threads with stopThread method'
-    name = None
-    logger = logging.getLogger('default')
+op6=>operation: import socket
+op8=>operation: import time
+op10=>operation: import protocol
+op12=>operation: import state
+op14=>operation: import connectionpool
+op16=>operation: from queues import receiveDataQueue
+op18=>operation: from bmproto import BMProto
+op20=>operation: from node import Peer
+op22=>operation: from objectracker import ObjectTracker
+op24=>operation: logger = logging.getLogger('default')
+op26=>operation: class UDPSocket(BMProto):
+    'Bitmessage protocol over UDP (class)'
+    port = 8444
 
-    def __init__(self, name=None):
-        if name:
-            self.name = name
-        super(StoppableThread, self).__init__(name=self.name)
-        self.stop = threading.Event()
-        self._stopped = False
-        random.seed()
-        self.logger.info('Init thread %s', self.name)
+    def __init__(self, host=None, sock=None, announcing=False):
+        super(BMProto, self).__init__(sock=sock)
+        self.verackReceived = True
+        self.verackSent = True
+        self.streams = [1]
+        self.fullyEstablished = True
+        self.skipUntil = 0
+        if (sock is None):
+            if (host is None):
+                host = ''
+            self.create_socket((socket.AF_INET6 if (':' in host) else socket.AF_INET), socket.SOCK_DGRAM)
+            self.set_socket_reuse()
+            logger.info('Binding UDP socket to %s:%i', host, self.port)
+            self.socket.bind((host, self.port))
+        else:
+            self.socket = sock
+            self.set_socket_reuse()
+        self.listening = Peer(*self.socket.getsockname())
+        self.destination = Peer(*self.socket.getsockname())
+        ObjectTracker.__init__(self)
+        self.connecting = False
+        self.connected = True
+        self.announcing = announcing
+        self.set_state('bm_header', expectBytes=protocol.Header.size)
 
-    def stopThread(self):
-        'Stop the thread'
-        self._stopped = True
-        self.stop.set()
-op14=>operation: class BusyError(threading.ThreadError):
-    '\n    Thread error raised when another connection holds the lock\n    we are trying to acquire.\n    '
-    pass
-st17=>start: start nonBlocking
-io19=>inputoutput: input: lock
-op22=>operation: '\n    A context manager which acquires given lock non-blocking\n    and raises BusyError if failed to acquire.\n    '
-op24=>operation: locked = lock.acquire(False)
-cond27=>operation: raise BusyError if  (not locked)
-op37=>operation: try:
-    (yield)
-finally:
-    lock.release()
-e39=>end: end nonBlocking
+    def set_socket_reuse(self):
+        'Set socket reuse option'
+        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+        except AttributeError:
+            pass
+
+    def bm_command_getdata(self):
+        return True
+
+    def bm_command_inv(self):
+        return True
+
+    def bm_command_addr(self):
+        addresses = self._decode_addr()
+        if (not self.local):
+            return True
+        remoteport = False
+        for (seenTime, stream, _, ip, port) in addresses:
+            decodedIP = protocol.checkIPAddress(str(ip))
+            if (stream not in connectionpool.pool.streams):
+                continue
+            if ((seenTime < (time.time() - protocol.MAX_TIME_OFFSET)) or (seenTime > (time.time() + protocol.MAX_TIME_OFFSET))):
+                continue
+            if (decodedIP is False):
+                remoteport = port
+        if (remoteport is False):
+            return True
+        logger.debug('received peer discovery from %s:%i (port %i):', self.destination.host, self.destination.port, remoteport)
+        state.discoveredPeers[Peer(self.destination.host, remoteport)] = time.time()
+        return True
+
+    def bm_command_portcheck(self):
+        return True
+
+    def bm_command_ping(self):
+        return True
+
+    def bm_command_pong(self):
+        return True
+
+    def bm_command_verack(self):
+        return True
+
+    def bm_command_version(self):
+        return True
+
+    def handle_connect(self):
+        return
+
+    def writable(self):
+        return self.write_buf
+
+    def readable(self):
+        return (len(self.read_buf) < self._buf_len)
+
+    def handle_read(self):
+        try:
+            (recdata, addr) = self.socket.recvfrom(self._buf_len)
+        except socket.error:
+            logger.error('socket error on recvfrom:', exc_info=True)
+            return
+        self.destination = Peer(*addr)
+        encodedAddr = protocol.encodeHost(addr[0])
+        self.local = bool(protocol.checkIPAddress(encodedAddr, True))
+        self.read_buf[0:] = recdata
+        self.bm_proto_reset()
+        receiveDataQueue.put(self.listening)
+
+    def handle_write(self):
+        try:
+            retval = self.socket.sendto(self.write_buf, ('<broadcast>', self.port))
+        except socket.error:
+            logger.error('socket error on sendto:', exc_info=True)
+            retval = len(self.write_buf)
+        self.slice_write_buf(retval)
 
 op2->op4
 op4->op6
@@ -248,13 +331,12 @@ op6->op8
 op8->op10
 op10->op12
 op12->op14
-op14->st17
-st17->io19
-io19->op22
+op14->op16
+op16->op18
+op18->op20
+op20->op22
 op22->op24
-op24->cond27
-cond27->op37
-op37->e39
+op24->op26
 </textarea></div>
         <div><button id="run" type="button">Run</button> <button onclick="HelpText()">Format Help</button></div>
         <div id="HelpTextBlock" style="display:none"><br/>Conditions can also be redirected like cond(yes, bottom) or cond(yes, right)

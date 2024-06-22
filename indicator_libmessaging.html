@@ -2,7 +2,7 @@
 <html lang="en">
     <head>
         <meta charset="utf-8">
-        <title>threads.html</title>
+        <title>indicator_libmessaging.html</title>
         <style type="text/css">
           .end-element { fill : #FFCCFF; }
         </style>
@@ -205,56 +205,65 @@ function base64ToSvgDocument(base64) {
         </script>
     </head>
     <body>
-        <div><textarea id="code" style="width: 100%;" rows="11">op2=>operation: 'Threading primitives for the network package'
-op4=>operation: import logging
-op6=>operation: import random
-op8=>operation: import threading
-op10=>operation: from contextlib import contextmanager
-op12=>operation: class StoppableThread(threading.Thread):
-    'Base class for application threads with stopThread method'
-    name = None
-    logger = logging.getLogger('default')
+        <div><textarea id="code" style="width: 100%;" rows="11">op2=>operation: '\nIndicator plugin using libmessaging\n'
+op4=>operation: import gi
+sub6=>subroutine: gi.require_version('MessagingMenu', '1.0')
+op8=>operation: from gi.repository import MessagingMenu
+op10=>operation: from pybitmessage.bitmessageqt.utils import str_broadcast_subscribers
+op12=>operation: from pybitmessage.tr import _translate
+op14=>operation: class IndicatorLibmessaging(object):
+    'Plugin for libmessage indicator'
 
-    def __init__(self, name=None):
-        if name:
-            self.name = name
-        super(StoppableThread, self).__init__(name=self.name)
-        self.stop = threading.Event()
-        self._stopped = False
-        random.seed()
-        self.logger.info('Init thread %s', self.name)
+    def __init__(self, form):
+        try:
+            self.app = MessagingMenu.App(desktop_id='pybitmessage.desktop')
+            self.app.register()
+            self.app.connect('activate-source', self.activate)
+        except:
+            self.app = None
+            return
+        self._menu = {'send': unicode(_translate('MainWindow', 'Send')), 'messages': unicode(_translate('MainWindow', 'Messages')), 'subscriptions': unicode(_translate('MainWindow', 'Subscriptions'))}
+        self.new_message_item = self.new_broadcast_item = None
+        self.form = form
+        self.show_unread()
 
-    def stopThread(self):
-        'Stop the thread'
-        self._stopped = True
-        self.stop.set()
-op14=>operation: class BusyError(threading.ThreadError):
-    '\n    Thread error raised when another connection holds the lock\n    we are trying to acquire.\n    '
-    pass
-st17=>start: start nonBlocking
-io19=>inputoutput: input: lock
-op22=>operation: '\n    A context manager which acquires given lock non-blocking\n    and raises BusyError if failed to acquire.\n    '
-op24=>operation: locked = lock.acquire(False)
-cond27=>operation: raise BusyError if  (not locked)
-op37=>operation: try:
-    (yield)
-finally:
-    lock.release()
-e39=>end: end nonBlocking
+    def __del__(self):
+        if self.app:
+            self.app.unregister()
+
+    def activate(self, app, source):
+        'Activate the libmessaging indicator plugin'
+        self.form.appIndicatorInbox((self.new_message_item if (source == 'messages') else self.new_broadcast_item))
+
+    def show_unread(self, draw_attention=False):
+        '\n        show the number of unread messages and subscriptions\n        on the messaging menu\n        '
+        for (source, count) in zip(('messages', 'subscriptions'), self.form.getUnread()):
+            if (count > 0):
+                if self.app.has_source(source):
+                    self.app.set_source_count(source, count)
+                else:
+                    self.app.append_source_with_count(source, None, self._menu[source], count)
+                if draw_attention:
+                    self.app.draw_attention(source)
+
+    def __call__(self, draw_attention, item=None, to_label=None):
+        if (not self.app):
+            return
+        if item:
+            if (to_label == str_broadcast_subscribers):
+                self.new_broadcast_item = item
+            else:
+                self.new_message_item = item
+        self.show_unread(draw_attention)
+op16=>operation: connect_plugin = IndicatorLibmessaging
 
 op2->op4
-op4->op6
-op6->op8
+op4->sub6
+sub6->op8
 op8->op10
 op10->op12
 op12->op14
-op14->st17
-st17->io19
-io19->op22
-op22->op24
-op24->cond27
-cond27->op37
-op37->e39
+op14->op16
 </textarea></div>
         <div><button id="run" type="button">Run</button> <button onclick="HelpText()">Format Help</button></div>
         <div id="HelpTextBlock" style="display:none"><br/>Conditions can also be redirected like cond(yes, bottom) or cond(yes, right)

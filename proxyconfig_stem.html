@@ -2,7 +2,7 @@
 <html lang="en">
     <head>
         <meta charset="utf-8">
-        <title>threads.html</title>
+        <title>proxyconfig_stem.html</title>
         <style type="text/css">
           .end-element { fill : #FFCCFF; }
         </style>
@@ -205,42 +205,93 @@ function base64ToSvgDocument(base64) {
         </script>
     </head>
     <body>
-        <div><textarea id="code" style="width: 100%;" rows="11">op2=>operation: 'Threading primitives for the network package'
+        <div><textarea id="code" style="width: 100%;" rows="11">op2=>operation: "\nConfigure tor proxy and hidden service with\n`stem <https://stem.torproject.org/>`_ depending on *bitmessagesettings*:\n\n  * try to start own tor instance on *socksport* if *sockshostname*\n    is unset or set to localhost;\n  * if *socksport* is already in use that instance is used only for\n    hidden service (if *sockslisten* is also set True);\n  * create ephemeral hidden service v3 if there is already *onionhostname*;\n  * otherwise use stem's 'BEST' version and save onion keys to the new\n    section using *onionhostname* as name for future use.\n"
 op4=>operation: import logging
-op6=>operation: import random
-op8=>operation: import threading
-op10=>operation: from contextlib import contextmanager
-op12=>operation: class StoppableThread(threading.Thread):
-    'Base class for application threads with stopThread method'
-    name = None
-    logger = logging.getLogger('default')
+op6=>operation: import os
+op8=>operation: import random
+op10=>operation: import sys
+op12=>operation: import tempfile
+op14=>operation: import stem
+op16=>operation: import stem.control
+op18=>operation: import stem.process
+op20=>operation: import stem.version
+op22=>operation: class DebugLogger(object):
+    "Safe logger wrapper for tor and plugin's logs"
 
-    def __init__(self, name=None):
-        if name:
-            self.name = name
-        super(StoppableThread, self).__init__(name=self.name)
-        self.stop = threading.Event()
-        self._stopped = False
-        random.seed()
-        self.logger.info('Init thread %s', self.name)
+    def __init__(self):
+        self._logger = logging.getLogger('default')
+        self._levels = {'err': 40, 'warn': 30, 'notice': 20}
 
-    def stopThread(self):
-        'Stop the thread'
-        self._stopped = True
-        self.stop.set()
-op14=>operation: class BusyError(threading.ThreadError):
-    '\n    Thread error raised when another connection holds the lock\n    we are trying to acquire.\n    '
-    pass
-st17=>start: start nonBlocking
-io19=>inputoutput: input: lock
-op22=>operation: '\n    A context manager which acquires given lock non-blocking\n    and raises BusyError if failed to acquire.\n    '
-op24=>operation: locked = lock.acquire(False)
-cond27=>operation: raise BusyError if  (not locked)
-op37=>operation: try:
-    (yield)
-finally:
-    lock.release()
-e39=>end: end nonBlocking
+    def __call__(self, line):
+        try:
+            (level, line) = line.split('[', 1)[1].split(']', 1)
+        except IndexError:
+            self._logger.debug(line)
+        except ValueError:
+            self._logger.warning(line)
+        else:
+            self._logger.log(self._levels.get(level, 10), '(tor) %s', line)
+st25=>start: start connect_plugin
+io27=>inputoutput: input: config
+op30=>operation: '\n    Run stem proxy configurator\n\n    :param config: current configuration instance\n    :type config: :class:`pybitmessage.bmconfigparser.BMConfigParser`\n    :return: True if configuration was done successfully\n    '
+op32=>operation: logwrite = DebugLogger()
+cond35=>condition: if (config.safeGet('bitmessagesettings', 'sockshostname', '') not in ('localhost', '127.0.0.1', ''))
+sub39=>subroutine: config.set('bitmessagesettings', 'socksproxytype', 'SOCKS5')
+sub41=>subroutine: logwrite('sockshostname is set to remote address, aborting stem proxy configuration')
+e44=>end: end function return
+op50=>operation: tor_config = {'SocksPort': '9050'}
+op52=>operation: datadir = tempfile.mkdtemp()
+cond55=>condition: if sys.platform.startswith('win')
+op59=>operation: tor_config['DataDirectory'] = datadir
+op68=>operation: port = config.safeGetInt('bitmessagesettings', 'socksport', 9050)
+cond71=>condition: for attempt in range(50)
+cond103=>condition: if (attempt > 0)
+op107=>operation: port = random.randint(32767, 65535)
+op109=>operation: tor_config['SocksPort'] = str(port)
+cond115=>condition: if tor_config.get('DataDirectory')
+op119=>operation: control_port = (port + 1)
+op121=>operation: tor_config['ControlPort'] = str(control_port)
+op126=>operation: try:
+    stem.process.launch_tor_with_config(tor_config, take_ownership=True, timeout=(None if sys.platform.startswith('win') else 20), init_msg_handler=logwrite)
+except OSError:
+    if (not attempt):
+        try:
+            stem.version.get_system_tor_version()
+        except IOError:
+            return
+    continue
+else:
+    logwrite(('Started tor on port %s' % port))
+    break
+sub130=>subroutine: config.setTemp('bitmessagesettings', 'socksproxytype', 'SOCKS5')
+cond133=>condition: if config.safeGetBoolean('bitmessagesettings', 'sockslisten')
+op137=>operation: try:
+    controller = (stem.control.Controller.from_port(port=control_port) if sys.platform.startswith('win') else stem.control.Controller.from_socket_file(control_socket))
+    controller.authenticate()
+except stem.SocketError:
+    logwrite('Failed to instantiate or authenticate on controller')
+    return
+op139=>operation: onionhostname = config.safeGet('bitmessagesettings', 'onionhostname')
+op141=>operation: onionkey = config.safeGet(onionhostname, 'privsigningkey')
+cond144=>operation: logwrite(('The hidden service found in config ): %s' % onionhostname)) if  (onionhostname and (not onionkey))
+op154=>operation: onionkeytype = config.safeGet(onionhostname, 'keytype')
+op156=>operation: response = controller.create_ephemeral_hidden_service({config.safeGetInt('bitmessagesettings', 'onionport', 8444): config.safeGetInt('bitmessagesettings', 'port', 8444)}, key_type=(onionkeytype or 'NEW'), key_content=(onionkey or (onionhostname and 'ED25519-V3') or 'BEST'))
+cond159=>condition: if (not response.is_ok())
+sub163=>subroutine: logwrite('Bad response from controller ):')
+e166=>end: end function return
+cond173=>condition: if (not onionkey)
+sub177=>subroutine: logwrite(('Started hidden service %s.onion' % response.service_id))
+cond180=>condition: if (not onionhostname)
+op184=>operation: onionhostname = (response.service_id + '.onion')
+sub186=>subroutine: config.set('bitmessagesettings', 'onionhostname', onionhostname)
+sub188=>subroutine: config.add_section(onionhostname)
+sub190=>subroutine: config.set(onionhostname, 'privsigningkey', response.private_key)
+sub192=>subroutine: config.set(onionhostname, 'keytype', response.private_key_type)
+sub194=>subroutine: config.save()
+io208=>inputoutput: output:  True
+e206=>end: end function return
+op63=>operation: control_socket = os.path.join(datadir, 'control')
+op65=>operation: tor_config['ControlSocket'] = control_socket
 
 op2->op4
 op4->op6
@@ -248,13 +299,62 @@ op6->op8
 op8->op10
 op10->op12
 op12->op14
-op14->st17
-st17->io19
-io19->op22
-op22->op24
-op24->cond27
-cond27->op37
-op37->e39
+op14->op16
+op16->op18
+op18->op20
+op20->op22
+op22->st25
+st25->io27
+io27->op30
+op30->op32
+op32->cond35
+cond35(yes)->sub39
+sub39->sub41
+sub41->e44
+cond35(no)->op50
+op50->op52
+op52->cond55
+cond55(yes)->op59
+op59->op68
+op68->cond71
+cond71(yes)->cond103
+cond103(yes)->op107
+op107->op109
+op109->cond115
+cond115(yes)->op119
+op119->op121
+op121->op126
+op126(left)->cond71
+cond115(no)->op126
+cond103(no)->cond115
+cond71(no)->sub130
+sub130->cond133
+cond133(yes)->op137
+op137->op139
+op139->op141
+op141->cond144
+cond144->op154
+op154->op156
+op156->cond159
+cond159(yes)->sub163
+sub163->e166
+cond159(no)->cond173
+cond173(yes)->sub177
+sub177->cond180
+cond180(yes)->op184
+op184->sub186
+sub186->sub188
+sub188->sub190
+sub190->sub192
+sub192->sub194
+sub194->io208
+io208->e206
+cond180(no)->io208
+cond173(no)->io208
+cond133(no)->io208
+cond55(no)->op63
+op63->op65
+op65->op68
 </textarea></div>
         <div><button id="run" type="button">Run</button> <button onclick="HelpText()">Format Help</button></div>
         <div id="HelpTextBlock" style="display:none"><br/>Conditions can also be redirected like cond(yes, bottom) or cond(yes, right)

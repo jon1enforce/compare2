@@ -2,7 +2,7 @@
 <html lang="en">
     <head>
         <meta charset="utf-8">
-        <title>threads.html</title>
+        <title>arithmetic.html</title>
         <style type="text/css">
           .end-element { fill : #FFCCFF; }
         </style>
@@ -205,42 +205,25 @@ function base64ToSvgDocument(base64) {
         </script>
     </head>
     <body>
-        <div><textarea id="code" style="width: 100%;" rows="11">op2=>operation: 'Threading primitives for the network package'
-op4=>operation: import logging
-op6=>operation: import random
-op8=>operation: import threading
-op10=>operation: from contextlib import contextmanager
-op12=>operation: class StoppableThread(threading.Thread):
-    'Base class for application threads with stopThread method'
-    name = None
-    logger = logging.getLogger('default')
-
-    def __init__(self, name=None):
-        if name:
-            self.name = name
-        super(StoppableThread, self).__init__(name=self.name)
-        self.stop = threading.Event()
-        self._stopped = False
-        random.seed()
-        self.logger.info('Init thread %s', self.name)
-
-    def stopThread(self):
-        'Stop the thread'
-        self._stopped = True
-        self.stop.set()
-op14=>operation: class BusyError(threading.ThreadError):
-    '\n    Thread error raised when another connection holds the lock\n    we are trying to acquire.\n    '
-    pass
-st17=>start: start nonBlocking
-io19=>inputoutput: input: lock
-op22=>operation: '\n    A context manager which acquires given lock non-blocking\n    and raises BusyError if failed to acquire.\n    '
-op24=>operation: locked = lock.acquire(False)
-cond27=>operation: raise BusyError if  (not locked)
-op37=>operation: try:
-    (yield)
-finally:
-    lock.release()
-e39=>end: end nonBlocking
+        <div><textarea id="code" style="width: 100%;" rows="11">op2=>operation: '\nArithmetic Expressions\n'
+op4=>operation: import hashlib
+op6=>operation: import re
+op8=>operation: P = ((((((((2 ** 256) - (2 ** 32)) - (2 ** 9)) - (2 ** 8)) - (2 ** 7)) - (2 ** 6)) - (2 ** 4)) - 1)
+op10=>operation: A = 0
+op12=>operation: Gx = 55066263022277343669578718895168534326250603453777594175500187360389116729240
+op14=>operation: Gy = 32670510020758816978083085130507043184471273380659243275938904335757337482424
+op16=>operation: G = (Gx, Gy)
+st19=>start: start inv
+io21=>inputoutput: input: a, n
+op24=>operation: 'Inversion'
+op26=>operation: (lm, hm) = (1, 0)
+op28=>operation: (low, high) = ((a % n), n)
+cond31=>condition: while (low > 1)
+op42=>operation: r = (high // low)
+op44=>operation: (nm, new) = ((hm - (lm * r)), (high - (low * r)))
+op46=>operation: (lm, low, hm, high) = (nm, new, lm, low)
+io53=>inputoutput: output:  (lm % n)
+e51=>end: end function return
 
 op2->op4
 op4->op6
@@ -248,13 +231,19 @@ op6->op8
 op8->op10
 op10->op12
 op12->op14
-op14->st17
-st17->io19
-io19->op22
-op22->op24
-op24->cond27
-cond27->op37
-op37->e39
+op14->op16
+op16->st19
+st19->io21
+io21->op24
+op24->op26
+op26->op28
+op28->cond31
+cond31(yes)->op42
+op42->op44
+op44->op46
+op46(left)->cond31
+cond31(no)->io53
+io53->e51
 </textarea></div>
         <div><button id="run" type="button">Run</button> <button onclick="HelpText()">Format Help</button></div>
         <div id="HelpTextBlock" style="display:none"><br/>Conditions can also be redirected like cond(yes, bottom) or cond(yes, right)

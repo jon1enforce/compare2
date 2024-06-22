@@ -2,7 +2,7 @@
 <html lang="en">
     <head>
         <meta charset="utf-8">
-        <title>threads.html</title>
+        <title>plugin.html</title>
         <style type="text/css">
           .end-element { fill : #FFCCFF; }
         </style>
@@ -205,56 +205,54 @@ function base64ToSvgDocument(base64) {
         </script>
     </head>
     <body>
-        <div><textarea id="code" style="width: 100%;" rows="11">op2=>operation: 'Threading primitives for the network package'
+        <div><textarea id="code" style="width: 100%;" rows="11">op2=>operation: '\nOperating with plugins\n'
 op4=>operation: import logging
-op6=>operation: import random
-op8=>operation: import threading
-op10=>operation: from contextlib import contextmanager
-op12=>operation: class StoppableThread(threading.Thread):
-    'Base class for application threads with stopThread method'
-    name = None
-    logger = logging.getLogger('default')
-
-    def __init__(self, name=None):
-        if name:
-            self.name = name
-        super(StoppableThread, self).__init__(name=self.name)
-        self.stop = threading.Event()
-        self._stopped = False
-        random.seed()
-        self.logger.info('Init thread %s', self.name)
-
-    def stopThread(self):
-        'Stop the thread'
-        self._stopped = True
-        self.stop.set()
-op14=>operation: class BusyError(threading.ThreadError):
-    '\n    Thread error raised when another connection holds the lock\n    we are trying to acquire.\n    '
+op6=>operation: import pkg_resources
+op8=>operation: logger = logging.getLogger('default')
+st11=>start: start get_plugins
+io13=>inputoutput: input: group, point, name, fallback
+op16=>operation: '\n    :param str group: plugin group\n    :param str point: plugin name prefix\n    :param name: exact plugin name\n    :param fallback: fallback plugin name\n\n    Iterate through plugins (``connect_plugin`` attribute of entry point)\n    which name starts with ``point`` or equals to ``name``.\n    If ``fallback`` kwarg specified, plugin with that name yield last.\n    '
+cond19=>condition: for ep in pkg_resources.iter_entry_points(('bitmessage.' + group))
+cond36=>operation: try:
+    plugin = ep.load().connect_plugin
+    if (ep.name == fallback):
+        _fallback = plugin
+    else:
+        (yield plugin)
+except (AttributeError, ImportError, ValueError, pkg_resources.DistributionNotFound, pkg_resources.UnknownExtra):
+    logger.debug('Problem while loading %s', ep.name, exc_info=True)
+    continue if  ((name and (ep.name == name)) or (not point) or ep.name.startswith(point))
+op48=>operation: try:
+    (yield _fallback)
+except NameError:
     pass
-st17=>start: start nonBlocking
-io19=>inputoutput: input: lock
-op22=>operation: '\n    A context manager which acquires given lock non-blocking\n    and raises BusyError if failed to acquire.\n    '
-op24=>operation: locked = lock.acquire(False)
-cond27=>operation: raise BusyError if  (not locked)
-op37=>operation: try:
-    (yield)
-finally:
-    lock.release()
-e39=>end: end nonBlocking
+e50=>end: end get_plugins
+st54=>start: start get_plugin
+io56=>inputoutput: input: 
+op59=>operation: '\n    :return: first available plugin from :func:`get_plugins` if any.\n    '
+cond62=>condition: for plugin in get_plugins(*args, **kwargs)
+io76=>inputoutput: output:  plugin
+e74=>end: end function return
+e81=>end: end get_plugin
 
 op2->op4
 op4->op6
 op6->op8
-op8->op10
-op10->op12
-op12->op14
-op14->st17
-st17->io19
-io19->op22
-op22->op24
-op24->cond27
-cond27->op37
-op37->e39
+op8->st11
+st11->io13
+io13->op16
+op16->cond19
+cond19(yes)->cond36
+cond36->cond19
+cond19(no)->op48
+op48->e50
+e50->st54
+st54->io56
+io56->op59
+op59->cond62
+cond62(yes)->io76
+io76->e74
+cond62(no)->e81
 </textarea></div>
         <div><button id="run" type="button">Run</button> <button onclick="HelpText()">Format Help</button></div>
         <div id="HelpTextBlock" style="display:none"><br/>Conditions can also be redirected like cond(yes, bottom) or cond(yes, right)

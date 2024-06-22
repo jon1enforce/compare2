@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <title>ecc.html</title>
+        <style type="text/css">
+          .end-element { fill : #FFCCFF; }
+        </style>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/raphael/2.3.0/raphael.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/flowchart/1.17.1/flowchart.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.1/js/bootstrap.bundle.min.js"></script>
+        <!-- <script src="../release/flowchart.min.js"></script> -->
+        <script>
+
+            window.onload = function () {
+                var btn = document.getElementById("run"),
+                    cd = document.getElementById("code"),
+                    chart;
+                    
+                (btn.onclick = function () {
+                    var code = cd.value;
+
+                    if (chart) {
+                      chart.clean();
+                    }
+
+                    chart = flowchart.parse(code);
+                    chart.drawSVG('canvas', {
+                      'x': 0,
+                      'y': 0,
+                      'line-width': 3,
+                      //'maxWidth': 15,//ensures the flowcharts fits within a certain width
+                      'line-length': 50,
+                      'text-margin': 10,
+                      'font-size': 14,
+                      'font': 'normal',
+                      'font-family': 'Helvetica',
+                      'font-weight': 'normal',
+                      'font-color': 'black',
+                      'line-color': 'black',
+                      'element-color': 'black',
+                      'fill': 'white',
+                      'yes-text': 'yes',
+                      'no-text': 'no',
+                      'arrow-end': 'block',
+                      'scale': 1,
+                      'symbols': {
+                        'start': {
+                          'font-size': 14,
+                          'font-color': 'yellow',
+                          'element-color': 'blue',
+                          'fill': 'green',
+                          'class': 'start-element'
+                        },
+                        'inputoutput': {
+                          'font-color': 'black',
+                          'element-color': 'black',
+                          'fill': 'bisque'
+                        },
+                        'operation': {
+                          'font-color': 'black',
+                          'element-color': 'black',
+                          'fill': 'linen'
+                        },
+                        'subroutine': {
+                          'font-color': 'black',
+                          'element-color': 'blue',
+                          'fill': 'lightgreen'
+                        },
+                        'condition': {
+                          'font-color': 'red',
+                          'element-color': 'black',
+                          'fill': 'yellow'
+                        },
+                        'end':{
+                          'font-size': 20,
+                          'class': 'end-element'
+                        }
+                      },
+                      'flowstate' : {
+                        //'past' : { 'fill' : '#CCCCCC', 'font-size' : 12},
+                        //'current' : {'fill' : 'yellow', 'font-color' : 'red', 'font-weight' : 'bold'},
+                        //'future' : { 'fill' : '#FFFF99'},
+                        'request' : { 'fill' : 'blue'},
+                        'invalid': {'fill' : '#444444'},
+                        'approved' : { 'fill' : '#58C4A3', 'font-size' : 12, 'yes-text' : 'APPROVED', 'no-text' : 'n/a' },
+                        'rejected' : { 'fill' : '#C45879', 'font-size' : 12, 'yes-text' : 'n/a', 'no-text' : 'REJECTED' }
+                      }
+                    });
+                    //create base64 encoding of SVG to generate download link for title(without html or htm).SVG
+                    var currentCanvasDIV = document.getElementById('canvas')
+                    var currentDrawSVG = currentCanvasDIV.innerHTML.replaceAll('ë','e');
+
+                    const OUTsvgBASE64 = btoa(currentDrawSVG)
+                    doctitle = document.title.replace('.html','');
+                    doctitle = doctitle.replace('.htm','');
+
+
+                    var currentCanvasDIV = document.getElementById('canvas')
+                    var currentDrawSVG = currentCanvasDIV.innerHTML.replaceAll('ë','e');
+                    svgSource = currentDrawSVG
+                    svgXML = currentDrawSVG;
+                    // Use SVG Height and Width from the SVG XML to set canvas size
+                    svgXMLsubstringHeight = svgXML.substring(svgXML.indexOf('height='), svgXML.indexOf('version='));
+                    svgXMLsubstringWidth = svgXML.substring(svgXML.indexOf('width='), svgXML.indexOf('xmlns='));
+                    HeightValue = svgXMLsubstringHeight.substring(svgXMLsubstringHeight.indexOf('"')+1,svgXMLsubstringHeight.lastIndexOf('"'));
+                    WidthValue = svgXMLsubstringWidth.substring(svgXMLsubstringWidth.indexOf('"')+1,svgXMLsubstringWidth.lastIndexOf('"'));
+                    HeightValueInt = Math.round(HeightValue)
+                    WidthValueInt = Math.round(WidthValue)
+                    // setup input for base64SvgToBase64Png
+                    let svgSrc = "data:image/svg+xml;base64,"+OUTsvgBASE64;
+                    var pngBase
+                    imageUtil.base64SvgToBase64Png(svgSrc, WidthValueInt, HeightValueInt).then(pngSrc => {
+                    pngBase = pngSrc
+                    // output download link for base64 PNG converted on download from base64
+                    var pngOutHtml = `<a href="${pngBase}" download="${doctitle}.png">PNG - Click here to download current rendered flowchart as ${doctitle}.png</a>`
+                    document.getElementById("pngbase64").innerHTML=pngOutHtml;
+                    });    
+                    // output download link for base64 SVG converted on download from base64
+                    var svgOutHtml = `<a href="data:image/svg+xml;base64,${OUTsvgBASE64}" download=${doctitle}.svg>SVG - Click here to download current rendered flowchart as ${doctitle}.svg</a> `
+                        document.getElementById("svgbase64").innerHTML=svgOutHtml;
+                    })();
+
+                            };
+                 
+
+// derived from https://stackoverflow.com/a/64800570
+// we need to use web browser canvas to generate a image. In this case png
+let imageUtil = {};
+/**
+ * converts a base64 encoded data url SVG image to a PNG image
+ * @param originalBase64 data url of svg image
+ * @param width target width in pixel of PNG image
+ * @param secondTry used internally to prevent endless recursion
+ * @return {Promise<unknown>} resolves to png data url of the image
+ */
+imageUtil.base64SvgToBase64Png = function (originalBase64, width, height, secondTry) {
+    return new Promise(resolve => {
+        let img = document.createElement('img');
+        img.onload = function () {
+            if (!secondTry && (img.naturalWidth === 0 || img.naturalHeight === 0)) {
+                let svgDoc = base64ToSvgDocument(originalBase64);
+                let fixedDoc = fixSvgDocumentFF(svgDoc);
+                return imageUtil.base64SvgToBase64Png(svgDocumentToBase64(fixedDoc), width, height, true).then(result => {
+                    resolve(result);
+                });
+            }
+            //document.body.appendChild(img);
+            let canvas2 = document.createElement("canvas");
+            //document.body.removeChild(img);
+            canvas2.width = width;
+            canvas2.height = height;
+            let ctx = canvas2.getContext("2d");
+            ctx.drawImage(img, 0, 0, canvas2.width, canvas2.height);
+            try {
+                let data = canvas2.toDataURL('image/png');
+                resolve(data);
+            } catch (e) {
+                resolve(null);
+            }
+        };
+        img.src = originalBase64;
+    });
+}
+
+//needed because Firefox doesn't correctly handle SVG with size = 0, see https://bugzilla.mozilla.org/show_bug.cgi?id=700533
+function fixSvgDocumentFF(svgDocument) {
+    try {
+        let widthInt = parseInt(svgDocument.documentElement.width.baseVal.value) || 500;
+        let heightInt = parseInt(svgDocument.documentElement.height.baseVal.value) || 500;
+        svgDocument.documentElement.width.baseVal.newValueSpecifiedUnits(SVGLength.SVG_LENGTHTYPE_PX, widthInt);
+        svgDocument.documentElement.height.baseVal.newValueSpecifiedUnits(SVGLength.SVG_LENGTHTYPE_PX, heightInt);
+        return svgDocument;
+    } catch (e) {
+        return svgDocument;
+    }
+}
+
+function svgDocumentToBase64(svgDocument) {
+    try {
+        let base64EncodedSVG = btoa(new XMLSerializer().serializeToString(svgDocument));
+        return 'data:image/svg+xml;base64,' + base64EncodedSVG;
+    } catch (e) {
+        return null;
+    }
+}
+
+function base64ToSvgDocument(base64) {
+    let svg = atob(base64.substring(base64.indexOf('base64,') + 7));
+    svg = svg.substring(svg.indexOf('<svg'));
+    let parser = new DOMParser();
+    return parser.parseFromString(svg, "image/svg+xml");
+} 
+        </script>
+
+        <script>
+            function HelpText() {
+              var x = document.getElementById("HelpTextBlock");
+              if (x.style.display === "none") {
+                x.style.display = "block";
+              } else {
+                x.style.display = "none";
+              }
+            }
+        </script>
+    </head>
+    <body>
+        <div><textarea id="code" style="width: 100%;" rows="11">op2=>operation: '\nAsymmetric cryptography using elliptic curves\n'
+op4=>operation: from hashlib import sha512
+op6=>operation: from struct import pack, unpack
+op8=>operation: from .cipher import Cipher
+op10=>operation: from .hash import equals, hmac_sha256
+op12=>operation: from .openssl import OpenSSL
+op14=>operation: class ECC(object):
+    '\n    Asymmetric encryption with Elliptic Curve Cryptography (ECC)\n    ECDH, ECDSA and ECIES\n\n        >>> from binascii import hexlify\n        >>> import pyelliptic\n\n        >>> alice = pyelliptic.ECC() # default curve: sect283r1\n        >>> bob = pyelliptic.ECC(curve=\'sect571r1\')\n\n        >>> ciphertext = alice.encrypt("Hello Bob", bob.get_pubkey())\n        >>> print(bob.decrypt(ciphertext))\n\n        >>> signature = bob.sign("Hello Alice")\n        >>> # alice\'s job :\n        >>> print(pyelliptic.ECC(\n        >>>     pubkey=bob.get_pubkey()).verify(signature, "Hello Alice"))\n\n        >>> # ERROR !!!\n        >>> try:\n        >>>     key = alice.get_ecdh_key(bob.get_pubkey())\n        >>> except:\n        >>>     print(\n                    "For ECDH key agreement, the keys must be defined"\n                    " on the same curve!")\n\n        >>> alice = pyelliptic.ECC(curve=\'sect571r1\')\n        >>> print(hexlify(alice.get_ecdh_key(bob.get_pubkey())))\n        >>> print(hexlify(bob.get_ecdh_key(alice.get_pubkey())))\n\n    '
+
+    def __init__(self, pubkey=None, privkey=None, pubkey_x=None, pubkey_y=None, raw_privkey=None, curve='sect283r1'):
+        '\n        For a normal and high level use, specifie pubkey,\n        privkey (if you need) and the curve\n        '
+        if isinstance(curve, str):
+            self.curve = OpenSSL.get_curve(curve)
+        else:
+            self.curve = curve
+        if ((pubkey_x is not None) and (pubkey_y is not None)):
+            self._set_keys(pubkey_x, pubkey_y, raw_privkey)
+        elif (pubkey is not None):
+            (curve, pubkey_x, pubkey_y, _) = ECC._decode_pubkey(pubkey)
+            if (privkey is not None):
+                (curve2, raw_privkey, _) = ECC._decode_privkey(privkey)
+                if (curve != curve2):
+                    raise Exception('Bad ECC keys ...')
+            self.curve = curve
+            self._set_keys(pubkey_x, pubkey_y, raw_privkey)
+        else:
+            (self.privkey, self.pubkey_x, self.pubkey_y) = self._generate()
+
+    def _set_keys(self, pubkey_x, pubkey_y, privkey):
+        if (self.raw_check_key(privkey, pubkey_x, pubkey_y) < 0):
+            self.pubkey_x = None
+            self.pubkey_y = None
+            self.privkey = None
+            raise Exception('Bad ECC keys ...')
+        self.pubkey_x = pubkey_x
+        self.pubkey_y = pubkey_y
+        self.privkey = privkey
+
+    @staticmethod
+    def get_curves():
+        '\n        Static method, returns the list of all the curves available\n        '
+        return OpenSSL.curves.keys()
+
+    def get_curve(self):
+        'The name of currently used curve'
+        return OpenSSL.get_curve_by_id(self.curve)
+
+    def get_curve_id(self):
+        'Currently used curve'
+        return self.curve
+
+    def get_pubkey(self):
+        '\n        High level function which returns :\n        curve(2) + len_of_pubkeyX(2) + pubkeyX + len_of_pubkeyY + pubkeyY\n        '
+        ctx = OpenSSL.BN_CTX_new()
+        n = OpenSSL.BN_new()
+        group = OpenSSL.EC_GROUP_new_by_curve_name(self.curve)
+        OpenSSL.EC_GROUP_get_order(group, n, ctx)
+        key_len = OpenSSL.BN_num_bytes(n)
+        pubkey_x = self.pubkey_x.rjust(key_len, b'\x00')
+        pubkey_y = self.pubkey_y.rjust(key_len, b'\x00')
+        return b''.join((pack('!H', self.curve), pack('!H', len(pubkey_x)), pubkey_x, pack('!H', len(pubkey_y)), pubkey_y))
+
+    def get_privkey(self):
+        '\n        High level function which returns\n        curve(2) + len_of_privkey(2) + privkey\n        '
+        return b''.join((pack('!H', self.curve), pack('!H', len(self.privkey)), self.privkey))
+
+    @staticmethod
+    def _decode_pubkey(pubkey):
+        i = 0
+        curve = unpack('!H', pubkey[i:(i + 2)])[0]
+        i += 2
+        tmplen = unpack('!H', pubkey[i:(i + 2)])[0]
+        i += 2
+        pubkey_x = pubkey[i:(i + tmplen)]
+        i += tmplen
+        tmplen = unpack('!H', pubkey[i:(i + 2)])[0]
+        i += 2
+        pubkey_y = pubkey[i:(i + tmplen)]
+        i += tmplen
+        return (curve, pubkey_x, pubkey_y, i)
+
+    @staticmethod
+    def _decode_privkey(privkey):
+        i = 0
+        curve = unpack('!H', privkey[i:(i + 2)])[0]
+        i += 2
+        tmplen = unpack('!H', privkey[i:(i + 2)])[0]
+        i += 2
+        privkey = privkey[i:(i + tmplen)]
+        i += tmplen
+        return (curve, privkey, i)
+
+    def _generate(self):
+        try:
+            pub_key_x = OpenSSL.BN_new()
+            pub_key_y = OpenSSL.BN_new()
+            key = OpenSSL.EC_KEY_new_by_curve_name(self.curve)
+            if (key == 0):
+                raise Exception('[OpenSSL] EC_KEY_new_by_curve_name FAIL ...')
+            if (OpenSSL.EC_KEY_generate_key(key) == 0):
+                raise Exception('[OpenSSL] EC_KEY_generate_key FAIL ...')
+            if (OpenSSL.EC_KEY_check_key(key) == 0):
+                raise Exception('[OpenSSL] EC_KEY_check_key FAIL ...')
+            priv_key = OpenSSL.EC_KEY_get0_private_key(key)
+            group = OpenSSL.EC_KEY_get0_group(key)
+            pub_key = OpenSSL.EC_KEY_get0_public_key(key)
+            if (OpenSSL.EC_POINT_get_affine_coordinates_GFp(group, pub_key, pub_key_x, pub_key_y, 0) == 0):
+                raise Exception('[OpenSSL] EC_POINT_get_affine_coordinates_GFp FAIL ...')
+            privkey = OpenSSL.malloc(0, OpenSSL.BN_num_bytes(priv_key))
+            pubkeyx = OpenSSL.malloc(0, OpenSSL.BN_num_bytes(pub_key_x))
+            pubkeyy = OpenSSL.malloc(0, OpenSSL.BN_num_bytes(pub_key_y))
+            OpenSSL.BN_bn2bin(priv_key, privkey)
+            privkey = privkey.raw
+            OpenSSL.BN_bn2bin(pub_key_x, pubkeyx)
+            pubkeyx = pubkeyx.raw
+            OpenSSL.BN_bn2bin(pub_key_y, pubkeyy)
+            pubkeyy = pubkeyy.raw
+            self.raw_check_key(privkey, pubkeyx, pubkeyy)
+            return (privkey, pubkeyx, pubkeyy)
+        finally:
+            OpenSSL.EC_KEY_free(key)
+            OpenSSL.BN_free(pub_key_x)
+            OpenSSL.BN_free(pub_key_y)
+
+    def get_ecdh_key(self, pubkey):
+        '\n        High level function. Compute public key with the local private key\n        and returns a 512bits shared key.\n        '
+        (curve, pubkey_x, pubkey_y, _) = ECC._decode_pubkey(pubkey)
+        if (curve != self.curve):
+            raise Exception('ECC keys must be from the same curve !')
+        return sha512(self.raw_get_ecdh_key(pubkey_x, pubkey_y)).digest()
+
+    def raw_get_ecdh_key(self, pubkey_x, pubkey_y):
+        'ECDH key as binary data'
+        try:
+            ecdh_keybuffer = OpenSSL.malloc(0, 32)
+            other_key = OpenSSL.EC_KEY_new_by_curve_name(self.curve)
+            if (other_key == 0):
+                raise Exception('[OpenSSL] EC_KEY_new_by_curve_name FAIL ...')
+            other_pub_key_x = OpenSSL.BN_bin2bn(pubkey_x, len(pubkey_x), None)
+            other_pub_key_y = OpenSSL.BN_bin2bn(pubkey_y, len(pubkey_y), None)
+            other_group = OpenSSL.EC_KEY_get0_group(other_key)
+            other_pub_key = OpenSSL.EC_POINT_new(other_group)
+            if (OpenSSL.EC_POINT_set_affine_coordinates_GFp(other_group, other_pub_key, other_pub_key_x, other_pub_key_y, 0) == 0):
+                raise Exception('[OpenSSL] EC_POINT_set_affine_coordinates_GFp FAIL ...')
+            if (OpenSSL.EC_KEY_set_public_key(other_key, other_pub_key) == 0):
+                raise Exception('[OpenSSL] EC_KEY_set_public_key FAIL ...')
+            if (OpenSSL.EC_KEY_check_key(other_key) == 0):
+                raise Exception('[OpenSSL] EC_KEY_check_key FAIL ...')
+            own_key = OpenSSL.EC_KEY_new_by_curve_name(self.curve)
+            if (own_key == 0):
+                raise Exception('[OpenSSL] EC_KEY_new_by_curve_name FAIL ...')
+            own_priv_key = OpenSSL.BN_bin2bn(self.privkey, len(self.privkey), None)
+            if (OpenSSL.EC_KEY_set_private_key(own_key, own_priv_key) == 0):
+                raise Exception('[OpenSSL] EC_KEY_set_private_key FAIL ...')
+            if ((OpenSSL._hexversion > 269484032) and (not OpenSSL._libreSSL)):
+                OpenSSL.EC_KEY_set_method(own_key, OpenSSL.EC_KEY_OpenSSL())
+            else:
+                OpenSSL.ECDH_set_method(own_key, OpenSSL.ECDH_OpenSSL())
+            ecdh_keylen = OpenSSL.ECDH_compute_key(ecdh_keybuffer, 32, other_pub_key, own_key, 0)
+            if (ecdh_keylen != 32):
+                raise Exception('[OpenSSL] ECDH keylen FAIL ...')
+            return ecdh_keybuffer.raw
+        finally:
+            OpenSSL.EC_KEY_free(other_key)
+            OpenSSL.BN_free(other_pub_key_x)
+            OpenSSL.BN_free(other_pub_key_y)
+            OpenSSL.EC_POINT_free(other_pub_key)
+            OpenSSL.EC_KEY_free(own_key)
+            OpenSSL.BN_free(own_priv_key)
+
+    def check_key(self, privkey, pubkey):
+        '\n        Check the public key and the private key.\n        The private key is optional (replace by None).\n        '
+        (curve, pubkey_x, pubkey_y, _) = ECC._decode_pubkey(pubkey)
+        if (privkey is None):
+            raw_privkey = None
+            curve2 = curve
+        else:
+            (curve2, raw_privkey, _) = ECC._decode_privkey(privkey)
+        if (curve != curve2):
+            raise Exception('Bad public and private key')
+        return self.raw_check_key(raw_privkey, pubkey_x, pubkey_y, curve)
+
+    def raw_check_key(self, privkey, pubkey_x, pubkey_y, curve=None):
+        'Check key validity, key is supplied as binary data'
+        if (curve is None):
+            curve = self.curve
+        elif isinstance(curve, str):
+            curve = OpenSSL.get_curve(curve)
+        try:
+            key = OpenSSL.EC_KEY_new_by_curve_name(curve)
+            if (key == 0):
+                raise Exception('[OpenSSL] EC_KEY_new_by_curve_name FAIL ...')
+            if (privkey is not None):
+                priv_key = OpenSSL.BN_bin2bn(privkey, len(privkey), None)
+            pub_key_x = OpenSSL.BN_bin2bn(pubkey_x, len(pubkey_x), None)
+            pub_key_y = OpenSSL.BN_bin2bn(pubkey_y, len(pubkey_y), None)
+            if (privkey is not None):
+                if (OpenSSL.EC_KEY_set_private_key(key, priv_key) == 0):
+                    raise Exception('[OpenSSL] EC_KEY_set_private_key FAIL ...')
+            group = OpenSSL.EC_KEY_get0_group(key)
+            pub_key = OpenSSL.EC_POINT_new(group)
+            if (OpenSSL.EC_POINT_set_affine_coordinates_GFp(group, pub_key, pub_key_x, pub_key_y, 0) == 0):
+                raise Exception('[OpenSSL] EC_POINT_set_affine_coordinates_GFp FAIL ...')
+            if (OpenSSL.EC_KEY_set_public_key(key, pub_key) == 0):
+                raise Exception('[OpenSSL] EC_KEY_set_public_key FAIL ...')
+            if (OpenSSL.EC_KEY_check_key(key) == 0):
+                raise Exception('[OpenSSL] EC_KEY_check_key FAIL ...')
+            return 0
+        finally:
+            OpenSSL.EC_KEY_free(key)
+            OpenSSL.BN_free(pub_key_x)
+            OpenSSL.BN_free(pub_key_y)
+            OpenSSL.EC_POINT_free(pub_key)
+            if (privkey is not None):
+                OpenSSL.BN_free(priv_key)
+
+    def sign(self, inputb, digest_alg=OpenSSL.digest_ecdsa_sha1):
+        '\n        Sign the input with ECDSA method and returns the signature\n        '
+        try:
+            size = len(inputb)
+            buff = OpenSSL.malloc(inputb, size)
+            digest = OpenSSL.malloc(0, 64)
+            if ((OpenSSL._hexversion > 269484032) and (not OpenSSL._libreSSL)):
+                md_ctx = OpenSSL.EVP_MD_CTX_new()
+            else:
+                md_ctx = OpenSSL.EVP_MD_CTX_create()
+            dgst_len = OpenSSL.pointer(OpenSSL.c_int(0))
+            siglen = OpenSSL.pointer(OpenSSL.c_int(0))
+            sig = OpenSSL.malloc(0, 151)
+            key = OpenSSL.EC_KEY_new_by_curve_name(self.curve)
+            if (key == 0):
+                raise Exception('[OpenSSL] EC_KEY_new_by_curve_name FAIL ...')
+            priv_key = OpenSSL.BN_bin2bn(self.privkey, len(self.privkey), None)
+            pub_key_x = OpenSSL.BN_bin2bn(self.pubkey_x, len(self.pubkey_x), None)
+            pub_key_y = OpenSSL.BN_bin2bn(self.pubkey_y, len(self.pubkey_y), None)
+            if (OpenSSL.EC_KEY_set_private_key(key, priv_key) == 0):
+                raise Exception('[OpenSSL] EC_KEY_set_private_key FAIL ...')
+            group = OpenSSL.EC_KEY_get0_group(key)
+            pub_key = OpenSSL.EC_POINT_new(group)
+            if (OpenSSL.EC_POINT_set_affine_coordinates_GFp(group, pub_key, pub_key_x, pub_key_y, 0) == 0):
+                raise Exception('[OpenSSL] EC_POINT_set_affine_coordinates_GFp FAIL ...')
+            if (OpenSSL.EC_KEY_set_public_key(key, pub_key) == 0):
+                raise Exception('[OpenSSL] EC_KEY_set_public_key FAIL ...')
+            if (OpenSSL.EC_KEY_check_key(key) == 0):
+                raise Exception('[OpenSSL] EC_KEY_check_key FAIL ...')
+            if ((OpenSSL._hexversion > 269484032) and (not OpenSSL._libreSSL)):
+                OpenSSL.EVP_MD_CTX_new(md_ctx)
+            else:
+                OpenSSL.EVP_MD_CTX_init(md_ctx)
+            OpenSSL.EVP_DigestInit_ex(md_ctx, digest_alg(), None)
+            if (OpenSSL.EVP_DigestUpdate(md_ctx, buff, size) == 0):
+                raise Exception('[OpenSSL] EVP_DigestUpdate FAIL ...')
+            OpenSSL.EVP_DigestFinal_ex(md_ctx, digest, dgst_len)
+            OpenSSL.ECDSA_sign(0, digest, dgst_len.contents, sig, siglen, key)
+            if (OpenSSL.ECDSA_verify(0, digest, dgst_len.contents, sig, siglen.contents, key) != 1):
+                raise Exception('[OpenSSL] ECDSA_verify FAIL ...')
+            return sig.raw[:siglen.contents.value]
+        finally:
+            OpenSSL.EC_KEY_free(key)
+            OpenSSL.BN_free(pub_key_x)
+            OpenSSL.BN_free(pub_key_y)
+            OpenSSL.BN_free(priv_key)
+            OpenSSL.EC_POINT_free(pub_key)
+            if ((OpenSSL._hexversion > 269484032) and (not OpenSSL._libreSSL)):
+                OpenSSL.EVP_MD_CTX_free(md_ctx)
+            else:
+                OpenSSL.EVP_MD_CTX_destroy(md_ctx)
+
+    def verify(self, sig, inputb, digest_alg=OpenSSL.digest_ecdsa_sha1):
+        '\n        Verify the signature with the input and the local public key.\n        Returns a boolean.\n        '
+        try:
+            bsig = OpenSSL.malloc(sig, len(sig))
+            binputb = OpenSSL.malloc(inputb, len(inputb))
+            digest = OpenSSL.malloc(0, 64)
+            dgst_len = OpenSSL.pointer(OpenSSL.c_int(0))
+            if ((OpenSSL._hexversion > 269484032) and (not OpenSSL._libreSSL)):
+                md_ctx = OpenSSL.EVP_MD_CTX_new()
+            else:
+                md_ctx = OpenSSL.EVP_MD_CTX_create()
+            key = OpenSSL.EC_KEY_new_by_curve_name(self.curve)
+            if (key == 0):
+                raise Exception('[OpenSSL] EC_KEY_new_by_curve_name FAIL ...')
+            pub_key_x = OpenSSL.BN_bin2bn(self.pubkey_x, len(self.pubkey_x), None)
+            pub_key_y = OpenSSL.BN_bin2bn(self.pubkey_y, len(self.pubkey_y), None)
+            group = OpenSSL.EC_KEY_get0_group(key)
+            pub_key = OpenSSL.EC_POINT_new(group)
+            if (OpenSSL.EC_POINT_set_affine_coordinates_GFp(group, pub_key, pub_key_x, pub_key_y, 0) == 0):
+                raise Exception('[OpenSSL] EC_POINT_set_affine_coordinates_GFp FAIL ...')
+            if (OpenSSL.EC_KEY_set_public_key(key, pub_key) == 0):
+                raise Exception('[OpenSSL] EC_KEY_set_public_key FAIL ...')
+            if (OpenSSL.EC_KEY_check_key(key) == 0):
+                raise Exception('[OpenSSL] EC_KEY_check_key FAIL ...')
+            if ((OpenSSL._hexversion > 269484032) and (not OpenSSL._libreSSL)):
+                OpenSSL.EVP_MD_CTX_new(md_ctx)
+            else:
+                OpenSSL.EVP_MD_CTX_init(md_ctx)
+            OpenSSL.EVP_DigestInit_ex(md_ctx, digest_alg(), None)
+            if (OpenSSL.EVP_DigestUpdate(md_ctx, binputb, len(inputb)) == 0):
+                raise Exception('[OpenSSL] EVP_DigestUpdate FAIL ...')
+            OpenSSL.EVP_DigestFinal_ex(md_ctx, digest, dgst_len)
+            ret = OpenSSL.ECDSA_verify(0, digest, dgst_len.contents, bsig, len(sig), key)
+            if (ret == (- 1)):
+                return False
+            if (ret == 0):
+                return False
+            return True
+        finally:
+            OpenSSL.EC_KEY_free(key)
+            OpenSSL.BN_free(pub_key_x)
+            OpenSSL.BN_free(pub_key_y)
+            OpenSSL.EC_POINT_free(pub_key)
+            if ((OpenSSL._hexversion > 269484032) and (not OpenSSL._libreSSL)):
+                OpenSSL.EVP_MD_CTX_free(md_ctx)
+            else:
+                OpenSSL.EVP_MD_CTX_destroy(md_ctx)
+
+    @staticmethod
+    def encrypt(data, pubkey, ephemcurve=None, ciphername='aes-256-cbc'):
+        '\n        Encrypt data with ECIES method using the public key of the recipient.\n        '
+        (curve, pubkey_x, pubkey_y, _) = ECC._decode_pubkey(pubkey)
+        return ECC.raw_encrypt(data, pubkey_x, pubkey_y, curve=curve, ephemcurve=ephemcurve, ciphername=ciphername)
+
+    @staticmethod
+    def raw_encrypt(data, pubkey_x, pubkey_y, curve='sect283r1', ephemcurve=None, ciphername='aes-256-cbc'):
+        'ECDH encryption, keys supplied in binary data format'
+        if (ephemcurve is None):
+            ephemcurve = curve
+        ephem = ECC(curve=ephemcurve)
+        key = sha512(ephem.raw_get_ecdh_key(pubkey_x, pubkey_y)).digest()
+        (key_e, key_m) = (key[:32], key[32:])
+        pubkey = ephem.get_pubkey()
+        _iv = Cipher.gen_IV(ciphername)
+        ctx = Cipher(key_e, _iv, 1, ciphername)
+        ciphertext = ((_iv + pubkey) + ctx.ciphering(data))
+        mac = hmac_sha256(key_m, ciphertext)
+        return (ciphertext + mac)
+
+    def decrypt(self, data, ciphername='aes-256-cbc'):
+        '\n        Decrypt data with ECIES method using the local private key\n        '
+        blocksize = OpenSSL.get_cipher(ciphername).get_blocksize()
+        _iv = data[:blocksize]
+        i = blocksize
+        (_, pubkey_x, pubkey_y, _i2) = ECC._decode_pubkey(data[i:])
+        i += _i2
+        ciphertext = data[i:(len(data) - 32)]
+        i += len(ciphertext)
+        mac = data[i:]
+        key = sha512(self.raw_get_ecdh_key(pubkey_x, pubkey_y)).digest()
+        (key_e, key_m) = (key[:32], key[32:])
+        if (not equals(hmac_sha256(key_m, data[:(len(data) - 32)]), mac)):
+            raise RuntimeError('Fail to verify data')
+        ctx = Cipher(key_e, _iv, 0, ciphername)
+        retval = ctx.ciphering(ciphertext)
+        return retval
+
+op2->op4
+op4->op6
+op6->op8
+op8->op10
+op10->op12
+op12->op14
+</textarea></div>
+        <div><button id="run" type="button">Run</button> <button onclick="HelpText()">Format Help</button></div>
+        <div id="HelpTextBlock" style="display:none"><br/>Conditions can also be redirected like cond(yes, bottom) or cond(yes, right)
+... and the other symbols too... like sub1(right)<br/>
+You can also tweak the <b>diagram.drawSVG('diagram', {});</b> script in this file for more changes<br/>
+This is based on <a href="https://github.com/adrai/flowchart.js">flowchart.js on github</a> and <a href="http://flowchart.js.org">http://flowchart.js.org</a> more documentation can be found over there.
+</div><br/><div id="svgbase64"></div>
+        <div id="pngbase64"></div>
+
+        <div id="canvas"></div>
+    </body>
+</html>

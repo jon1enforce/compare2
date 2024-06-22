@@ -2,7 +2,7 @@
 <html lang="en">
     <head>
         <meta charset="utf-8">
-        <title>threads.html</title>
+        <title>tls.html</title>
         <style type="text/css">
           .end-element { fill : #FFCCFF; }
         </style>
@@ -205,42 +205,158 @@ function base64ToSvgDocument(base64) {
         </script>
     </head>
     <body>
-        <div><textarea id="code" style="width: 100%;" rows="11">op2=>operation: 'Threading primitives for the network package'
+        <div><textarea id="code" style="width: 100%;" rows="11">op2=>operation: '\nSSL/TLS negotiation.\n'
 op4=>operation: import logging
-op6=>operation: import random
-op8=>operation: import threading
-op10=>operation: from contextlib import contextmanager
-op12=>operation: class StoppableThread(threading.Thread):
-    'Base class for application threads with stopThread method'
-    name = None
-    logger = logging.getLogger('default')
+op6=>operation: import os
+op8=>operation: import socket
+op10=>operation: import ssl
+op12=>operation: import sys
+op14=>operation: import network.asyncore_pollchoose as asyncore
+op16=>operation: import paths
+op18=>operation: from network.advanceddispatcher import AdvancedDispatcher
+op20=>operation: from queues import receiveDataQueue
+op22=>operation: logger = logging.getLogger('default')
+op24=>operation: _DISCONNECTED_SSL = frozenset((ssl.SSL_ERROR_EOF,))
+cond27=>condition: if (sys.version_info >= (2, 7, 13))
+op31=>operation: sslProtocolVersion = ssl.PROTOCOL_TLS
+cond49=>condition: if ((ssl.OPENSSL_VERSION_NUMBER >= 269484032) and (not ssl.OPENSSL_VERSION.startswith(b'LibreSSL')))
+op53=>operation: sslProtocolCiphers = 'AECDH-AES256-SHA@SECLEVEL=0'
+op60=>operation: class TLSDispatcher(AdvancedDispatcher):
+    'TLS functionality for classes derived from AdvancedDispatcher'
 
-    def __init__(self, name=None):
-        if name:
-            self.name = name
-        super(StoppableThread, self).__init__(name=self.name)
-        self.stop = threading.Event()
-        self._stopped = False
-        random.seed()
-        self.logger.info('Init thread %s', self.name)
+    def __init__(self, _=None, sock=None, certfile=None, keyfile=None, server_side=False, ciphers=sslProtocolCiphers):
+        self.want_read = self.want_write = True
+        self.certfile = (certfile or os.path.join(paths.codePath(), 'sslkeys', 'cert.pem'))
+        self.keyfile = (keyfile or os.path.join(paths.codePath(), 'sslkeys', 'key.pem'))
+        self.server_side = server_side
+        self.ciphers = ciphers
+        self.tlsStarted = False
+        self.tlsDone = False
+        self.tlsVersion = 'N/A'
+        self.isSSL = False
 
-    def stopThread(self):
-        'Stop the thread'
-        self._stopped = True
-        self.stop.set()
-op14=>operation: class BusyError(threading.ThreadError):
-    '\n    Thread error raised when another connection holds the lock\n    we are trying to acquire.\n    '
-    pass
-st17=>start: start nonBlocking
-io19=>inputoutput: input: lock
-op22=>operation: '\n    A context manager which acquires given lock non-blocking\n    and raises BusyError if failed to acquire.\n    '
-op24=>operation: locked = lock.acquire(False)
-cond27=>operation: raise BusyError if  (not locked)
-op37=>operation: try:
-    (yield)
-finally:
-    lock.release()
-e39=>end: end nonBlocking
+    def state_tls_init(self):
+        'Prepare sockets for TLS handshake'
+        self.isSSL = True
+        self.tlsStarted = True
+        if (sys.version_info >= (2, 7, 9)):
+            context = ssl.create_default_context(purpose=(ssl.Purpose.SERVER_AUTH if self.server_side else ssl.Purpose.CLIENT_AUTH))
+            context.set_ciphers(self.ciphers)
+            context.set_ecdh_curve('secp256k1')
+            context.check_hostname = False
+            context.verify_mode = ssl.CERT_NONE
+            context.options = ((((ssl.OP_ALL | ssl.OP_NO_SSLv2) | ssl.OP_NO_SSLv3) | ssl.OP_SINGLE_ECDH_USE) | ssl.OP_CIPHER_SERVER_PREFERENCE)
+            self.sslSocket = context.wrap_socket(self.socket, server_side=self.server_side, do_handshake_on_connect=False)
+        else:
+            self.sslSocket = ssl.wrap_socket(self.socket, server_side=self.server_side, ssl_version=sslProtocolVersion, certfile=self.certfile, keyfile=self.keyfile, ciphers=self.ciphers, do_handshake_on_connect=False)
+        self.sslSocket.setblocking(0)
+        self.want_read = self.want_write = True
+        self.set_state('tls_handshake')
+        return False
+
+    @staticmethod
+    def state_tls_handshake():
+        '\n        Do nothing while TLS handshake is pending, as during this phase\n        we need to react to callbacks instead\n        '
+        return False
+
+    def writable(self):
+        'Handle writable checks for TLS-enabled sockets'
+        try:
+            if (self.tlsStarted and (not self.tlsDone) and (not self.write_buf)):
+                return self.want_write
+        except AttributeError:
+            pass
+        return AdvancedDispatcher.writable(self)
+
+    def readable(self):
+        'Handle readable check for TLS-enabled sockets'
+        try:
+            if (self.tlsStarted and (not self.tlsDone) and (not self.write_buf)):
+                logger.debug('tls readable, %r', self.want_read)
+                return self.want_read
+            if ((not self.fullyEstablished) and ((self.expectBytes == 0) or (not self.write_buf_empty()))):
+                return False
+        except AttributeError:
+            pass
+        return AdvancedDispatcher.readable(self)
+
+    def handle_read(self):
+        '\n        Handle reads for sockets during TLS handshake. Requires special\n        treatment as during the handshake, buffers must remain empty\n        and normal reads must be ignored.\n        '
+        try:
+            if (self.tlsStarted and (not self.tlsDone) and (not self.write_buf)):
+                self.tls_handshake()
+            else:
+                AdvancedDispatcher.handle_read(self)
+        except AttributeError:
+            AdvancedDispatcher.handle_read(self)
+        except ssl.SSLError as err:
+            if (err.errno == ssl.SSL_ERROR_WANT_READ):
+                return
+            if (err.errno not in _DISCONNECTED_SSL):
+                logger.info('SSL Error: %s', err)
+            self.close_reason = 'SSL Error in handle_read'
+            self.handle_close()
+
+    def handle_write(self):
+        '\n        Handle writes for sockets during TLS handshake. Requires special\n        treatment as during the handshake, buffers must remain empty\n        and normal writes must be ignored.\n        '
+        try:
+            if (self.tlsStarted and (not self.tlsDone) and (not self.write_buf)):
+                self.tls_handshake()
+            else:
+                AdvancedDispatcher.handle_write(self)
+        except AttributeError:
+            AdvancedDispatcher.handle_write(self)
+        except ssl.SSLError as err:
+            if (err.errno == ssl.SSL_ERROR_WANT_WRITE):
+                return
+            if (err.errno not in _DISCONNECTED_SSL):
+                logger.info('SSL Error: %s', err)
+            self.close_reason = 'SSL Error in handle_write'
+            self.handle_close()
+
+    def tls_handshake(self):
+        'Perform TLS handshake and handle its stages'
+        if self.write_buf:
+            return False
+        try:
+            logger.debug('handshaking (internal)')
+            self.sslSocket.do_handshake()
+        except ssl.SSLError as err:
+            self.close_reason = 'SSL Error in tls_handshake'
+            logger.info('%s:%i: handshake fail', *self.destination)
+            self.want_read = self.want_write = False
+            if (err.args[0] == ssl.SSL_ERROR_WANT_READ):
+                logger.debug('want read')
+                self.want_read = True
+            if (err.args[0] == ssl.SSL_ERROR_WANT_WRITE):
+                logger.debug('want write')
+                self.want_write = True
+            if (not (self.want_write or self.want_read)):
+                raise
+        except socket.error as err:
+            if (err.errno in asyncore._DISCONNECTED):
+                self.close_reason = 'socket.error in tls_handshake'
+                self.handle_close()
+            else:
+                raise
+        else:
+            if (sys.version_info >= (2, 7, 9)):
+                self.tlsVersion = self.sslSocket.version()
+                logger.debug('%s:%i: TLS handshake success, TLS protocol version: %s', self.destination.host, self.destination.port, self.tlsVersion)
+            else:
+                self.tlsVersion = 'TLSv1'
+                logger.debug('%s:%i: TLS handshake success', self.destination.host, self.destination.port)
+            self.del_channel()
+            self.set_socket(self.sslSocket)
+            self.tlsDone = True
+            self.bm_proto_reset()
+            self.set_state('connection_fully_established')
+            receiveDataQueue.put(self.destination)
+        return False
+op57=>operation: sslProtocolCiphers = 'AECDH-AES256-SHA'
+cond36=>condition: if (sys.version_info >= (2, 7, 9))
+op40=>operation: sslProtocolVersion = ssl.PROTOCOL_SSLv23
+op44=>operation: sslProtocolVersion = ssl.PROTOCOL_TLSv1
 
 op2->op4
 op4->op6
@@ -248,13 +364,23 @@ op6->op8
 op8->op10
 op10->op12
 op12->op14
-op14->st17
-st17->io19
-io19->op22
+op14->op16
+op16->op18
+op18->op20
+op20->op22
 op22->op24
 op24->cond27
-cond27->op37
-op37->e39
+cond27(yes)->op31
+op31->cond49
+cond49(yes)->op53
+op53->op60
+cond49(no)->op57
+op57->op60
+cond27(no)->cond36
+cond36(yes)->op40
+op40->cond49
+cond36(no)->op44
+op44->cond49
 </textarea></div>
         <div><button id="run" type="button">Run</button> <button onclick="HelpText()">Format Help</button></div>
         <div id="HelpTextBlock" style="display:none"><br/>Conditions can also be redirected like cond(yes, bottom) or cond(yes, right)

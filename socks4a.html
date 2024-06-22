@@ -2,7 +2,7 @@
 <html lang="en">
     <head>
         <meta charset="utf-8">
-        <title>threads.html</title>
+        <title>socks4a.html</title>
         <style type="text/css">
           .end-element { fill : #FFCCFF; }
         </style>
@@ -205,42 +205,110 @@ function base64ToSvgDocument(base64) {
         </script>
     </head>
     <body>
-        <div><textarea id="code" style="width: 100%;" rows="11">op2=>operation: 'Threading primitives for the network package'
+        <div><textarea id="code" style="width: 100%;" rows="11">op2=>operation: '\nSOCKS4a proxy module\n'
 op4=>operation: import logging
-op6=>operation: import random
-op8=>operation: import threading
-op10=>operation: from contextlib import contextmanager
-op12=>operation: class StoppableThread(threading.Thread):
-    'Base class for application threads with stopThread method'
-    name = None
-    logger = logging.getLogger('default')
+op6=>operation: import socket
+op8=>operation: import struct
+op10=>operation: from proxy import GeneralProxyError, Proxy, ProxyError
+op12=>operation: logger = logging.getLogger('default')
+op14=>operation: class Socks4aError(ProxyError):
+    'SOCKS4a error base class'
+    errorCodes = ('Request granted', 'Request rejected or failed', 'Request rejected because SOCKS server cannot connect to identd on the client', 'Request rejected because the client program and identd report different user-ids', 'Unknown error')
+op16=>operation: class Socks4a(Proxy):
+    'SOCKS4a proxy class'
 
-    def __init__(self, name=None):
-        if name:
-            self.name = name
-        super(StoppableThread, self).__init__(name=self.name)
-        self.stop = threading.Event()
-        self._stopped = False
-        random.seed()
-        self.logger.info('Init thread %s', self.name)
+    def __init__(self, address=None):
+        Proxy.__init__(self, address)
+        self.ipaddr = None
+        self.destport = address[1]
 
-    def stopThread(self):
-        'Stop the thread'
-        self._stopped = True
-        self.stop.set()
-op14=>operation: class BusyError(threading.ThreadError):
-    '\n    Thread error raised when another connection holds the lock\n    we are trying to acquire.\n    '
-    pass
-st17=>start: start nonBlocking
-io19=>inputoutput: input: lock
-op22=>operation: '\n    A context manager which acquires given lock non-blocking\n    and raises BusyError if failed to acquire.\n    '
-op24=>operation: locked = lock.acquire(False)
-cond27=>operation: raise BusyError if  (not locked)
-op37=>operation: try:
-    (yield)
-finally:
-    lock.release()
-e39=>end: end nonBlocking
+    def state_init(self):
+        'Protocol initialisation (before connection is established)'
+        self.set_state('auth_done', 0)
+        return True
+
+    def state_pre_connect(self):
+        'Handle feedback from SOCKS4a while it is connecting on our behalf'
+        if (self.read_buf[0:1] != chr(0).encode()):
+            self.close()
+            raise GeneralProxyError(1)
+        elif (self.read_buf[1:2] != chr(90).encode()):
+            self.close()
+            if (ord(self.read_buf[1:2]) in (91, 92, 93)):
+                raise Socks4aError((ord(self.read_buf[1:2]) - 90))
+            else:
+                raise Socks4aError(4)
+        self.boundport = struct.unpack('>H', self.read_buf[2:4])[0]
+        self.boundaddr = self.read_buf[4:]
+        self.__proxysockname = (self.boundaddr, self.boundport)
+        if self.ipaddr:
+            self.__proxypeername = (socket.inet_ntoa(self.ipaddr), self.destination[1])
+        else:
+            self.__proxypeername = (self.destination[0], self.destport)
+        self.set_state('proxy_handshake_done', length=8)
+        return True
+
+    def proxy_sock_name(self):
+        '\n        Handle return value when using SOCKS4a for DNS resolving\n        instead of connecting.\n        '
+        return socket.inet_ntoa(self.__proxysockname[0])
+op18=>operation: class Socks4aConnection(Socks4a):
+    'Child SOCKS4a class used for making outbound connections.'
+
+    def __init__(self, address):
+        Socks4a.__init__(self, address=address)
+
+    def state_auth_done(self):
+        'Request connection to be made'
+        rmtrslv = False
+        self.append_write_buf(struct.pack('>BBH', 4, 1, self.destination[1]))
+        try:
+            self.ipaddr = socket.inet_aton(self.destination[0])
+            self.append_write_buf(self.ipaddr)
+        except socket.error:
+            if self._remote_dns:
+                rmtrslv = True
+                self.ipaddr = None
+                self.append_write_buf(struct.pack('BBBB', 0, 0, 0, 1))
+            else:
+                self.ipaddr = socket.inet_aton(socket.gethostbyname(self.destination[0]))
+                self.append_write_buf(self.ipaddr)
+        if self._auth:
+            self.append_write_buf(self._auth[0])
+        self.append_write_buf(chr(0).encode())
+        if rmtrslv:
+            self.append_write_buf((self.destination[0] + chr(0).encode()))
+        self.set_state('pre_connect', length=0, expectBytes=8)
+        return True
+
+    def state_pre_connect(self):
+        'Tell SOCKS4a to initiate a connection'
+        try:
+            return Socks4a.state_pre_connect(self)
+        except Socks4aError as e:
+            self.close_reason = e.message
+            self.set_state('close')
+op20=>operation: class Socks4aResolver(Socks4a):
+    'DNS resolver class using SOCKS4a'
+
+    def __init__(self, host):
+        self.host = host
+        self.port = 8444
+        Socks4a.__init__(self, address=(self.host, self.port))
+
+    def state_auth_done(self):
+        'Request connection to be made'
+        self.append_write_buf(struct.pack('>BBH', 4, 240, self.destination[1]))
+        self.append_write_buf(struct.pack('BBBB', 0, 0, 0, 1))
+        if self._auth:
+            self.append_write_buf(self._auth[0])
+        self.append_write_buf(chr(0).encode())
+        self.append_write_buf((self.host + chr(0).encode()))
+        self.set_state('pre_connect', length=0, expectBytes=8)
+        return True
+
+    def resolved(self):
+        "\n        Resolving is done, process the return value. To use this within\n        PyBitmessage, a callback needs to be implemented which hasn't\n        been done yet.\n        "
+        logger.debug('Resolved %s as %s', self.host, self.proxy_sock_name())
 
 op2->op4
 op4->op6
@@ -248,13 +316,9 @@ op6->op8
 op8->op10
 op10->op12
 op12->op14
-op14->st17
-st17->io19
-io19->op22
-op22->op24
-op24->cond27
-cond27->op37
-op37->e39
+op14->op16
+op16->op18
+op18->op20
 </textarea></div>
         <div><button id="run" type="button">Run</button> <button onclick="HelpText()">Format Help</button></div>
         <div id="HelpTextBlock" style="display:none"><br/>Conditions can also be redirected like cond(yes, bottom) or cond(yes, right)

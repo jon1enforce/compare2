@@ -2,7 +2,7 @@
 <html lang="en">
     <head>
         <meta charset="utf-8">
-        <title>threads.html</title>
+        <title>openssl.html</title>
         <style type="text/css">
           .end-element { fill : #FFCCFF; }
         </style>
@@ -205,56 +205,75 @@ function base64ToSvgDocument(base64) {
         </script>
     </head>
     <body>
-        <div><textarea id="code" style="width: 100%;" rows="11">op2=>operation: 'Threading primitives for the network package'
-op4=>operation: import logging
-op6=>operation: import random
-op8=>operation: import threading
-op10=>operation: from contextlib import contextmanager
-op12=>operation: class StoppableThread(threading.Thread):
-    'Base class for application threads with stopThread method'
-    name = None
-    logger = logging.getLogger('default')
+        <div><textarea id="code" style="width: 100%;" rows="11">op2=>operation: '\nThis module loads openssl libs with ctypes and incapsulates\nneeded openssl functionality in class _OpenSSL.\n'
+op4=>operation: import ctypes
+op6=>operation: import sys
+op8=>operation: OpenSSL = None
+op10=>operation: class CipherName(object):
+    'Class returns cipher name, pointer and blocksize'
 
-    def __init__(self, name=None):
-        if name:
-            self.name = name
-        super(StoppableThread, self).__init__(name=self.name)
-        self.stop = threading.Event()
-        self._stopped = False
-        random.seed()
-        self.logger.info('Init thread %s', self.name)
+    def __init__(self, name, pointer, blocksize):
+        self._name = name
+        self._pointer = pointer
+        self._blocksize = blocksize
 
-    def stopThread(self):
-        'Stop the thread'
-        self._stopped = True
-        self.stop.set()
-op14=>operation: class BusyError(threading.ThreadError):
-    '\n    Thread error raised when another connection holds the lock\n    we are trying to acquire.\n    '
-    pass
-st17=>start: start nonBlocking
-io19=>inputoutput: input: lock
-op22=>operation: '\n    A context manager which acquires given lock non-blocking\n    and raises BusyError if failed to acquire.\n    '
-op24=>operation: locked = lock.acquire(False)
-cond27=>operation: raise BusyError if  (not locked)
-op37=>operation: try:
-    (yield)
-finally:
-    lock.release()
-e39=>end: end nonBlocking
+    def __str__(self):
+        return ((((('Cipher : ' + self._name) + ' | Blocksize : ') + str(self._blocksize)) + ' | Function pointer : ') + str(self._pointer))
+
+    def get_pointer(self):
+        'This method returns cipher pointer'
+        return self._pointer()
+
+    def get_name(self):
+        'This method returns cipher name'
+        return self._name
+
+    def get_blocksize(self):
+        'This method returns cipher blocksize'
+        return self._blocksize
+st13=>start: start get_version
+io15=>inputoutput: input: library
+op18=>operation: 'This function return version, hexversion and cflages'
+op20=>operation: version = None
+op22=>operation: hexversion = None
+op24=>operation: cflags = None
+op26=>operation: try:
+    OPENSSL_VERSION = 0
+    OPENSSL_CFLAGS = 1
+    library.OpenSSL_version.argtypes = [ctypes.c_int]
+    library.OpenSSL_version.restype = ctypes.c_char_p
+    version = library.OpenSSL_version(OPENSSL_VERSION)
+    cflags = library.OpenSSL_version(OPENSSL_CFLAGS)
+    library.OpenSSL_version_num.restype = ctypes.c_long
+    hexversion = library.OpenSSL_version_num()
+except AttributeError:
+    try:
+        SSLEAY_VERSION = 0
+        SSLEAY_CFLAGS = 2
+        library.SSLeay.restype = ctypes.c_long
+        library.SSLeay_version.restype = ctypes.c_char_p
+        library.SSLeay_version.argtypes = [ctypes.c_int]
+        version = library.SSLeay_version(SSLEAY_VERSION)
+        cflags = library.SSLeay_version(SSLEAY_CFLAGS)
+        hexversion = library.SSLeay()
+    except AttributeError:
+        pass
+io31=>inputoutput: output:  (version, hexversion, cflags)
+e29=>end: end function return
 
 op2->op4
 op4->op6
 op6->op8
 op8->op10
-op10->op12
-op12->op14
-op14->st17
-st17->io19
-io19->op22
+op10->st13
+st13->io15
+io15->op18
+op18->op20
+op20->op22
 op22->op24
-op24->cond27
-cond27->op37
-op37->e39
+op24->op26
+op26->io31
+io31->e29
 </textarea></div>
         <div><button id="run" type="button">Run</button> <button onclick="HelpText()">Format Help</button></div>
         <div id="HelpTextBlock" style="display:none"><br/>Conditions can also be redirected like cond(yes, bottom) or cond(yes, right)

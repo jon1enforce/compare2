@@ -2,7 +2,7 @@
 <html lang="en">
     <head>
         <meta charset="utf-8">
-        <title>threads.html</title>
+        <title>desktop_xdg.html</title>
         <style type="text/css">
           .end-element { fill : #FFCCFF; }
         </style>
@@ -205,56 +205,35 @@ function base64ToSvgDocument(base64) {
         </script>
     </head>
     <body>
-        <div><textarea id="code" style="width: 100%;" rows="11">op2=>operation: 'Threading primitives for the network package'
-op4=>operation: import logging
-op6=>operation: import random
-op8=>operation: import threading
-op10=>operation: from contextlib import contextmanager
-op12=>operation: class StoppableThread(threading.Thread):
-    'Base class for application threads with stopThread method'
-    name = None
-    logger = logging.getLogger('default')
+        <div><textarea id="code" style="width: 100%;" rows="11">op2=>operation: import os
+op4=>operation: from xdg import BaseDirectory, Menu, Exceptions
+op6=>operation: class DesktopXDG(object):
+    'pyxdg Freedesktop desktop implementation'
 
-    def __init__(self, name=None):
-        if name:
-            self.name = name
-        super(StoppableThread, self).__init__(name=self.name)
-        self.stop = threading.Event()
-        self._stopped = False
-        random.seed()
-        self.logger.info('Init thread %s', self.name)
+    def __init__(self):
+        try:
+            self.desktop = Menu.parse().getMenu('Office').getMenuEntry('pybitmessage.desktop').DesktopEntry
+        except (AttributeError, Exceptions.ParsingError):
+            raise TypeError
+        appimage = os.getenv('APPIMAGE')
+        if appimage:
+            self.desktop.set('Exec', appimage)
 
-    def stopThread(self):
-        'Stop the thread'
-        self._stopped = True
-        self.stop.set()
-op14=>operation: class BusyError(threading.ThreadError):
-    '\n    Thread error raised when another connection holds the lock\n    we are trying to acquire.\n    '
-    pass
-st17=>start: start nonBlocking
-io19=>inputoutput: input: lock
-op22=>operation: '\n    A context manager which acquires given lock non-blocking\n    and raises BusyError if failed to acquire.\n    '
-op24=>operation: locked = lock.acquire(False)
-cond27=>operation: raise BusyError if  (not locked)
-op37=>operation: try:
-    (yield)
-finally:
-    lock.release()
-e39=>end: end nonBlocking
+    def adjust_startonlogon(self, autostart=False):
+        'Configure autostart according to settings'
+        autostart_path = os.path.join(BaseDirectory.xdg_config_home, 'autostart', 'pybitmessage.desktop')
+        if autostart:
+            self.desktop.write(autostart_path)
+        else:
+            try:
+                os.remove(autostart_path)
+            except OSError:
+                pass
+op8=>operation: connect_plugin = DesktopXDG
 
 op2->op4
 op4->op6
 op6->op8
-op8->op10
-op10->op12
-op12->op14
-op14->st17
-st17->io19
-io19->op22
-op22->op24
-op24->cond27
-cond27->op37
-op37->e39
 </textarea></div>
         <div><button id="run" type="button">Run</button> <button onclick="HelpText()">Format Help</button></div>
         <div id="HelpTextBlock" style="display:none"><br/>Conditions can also be redirected like cond(yes, bottom) or cond(yes, right)

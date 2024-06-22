@@ -2,7 +2,7 @@
 <html lang="en">
     <head>
         <meta charset="utf-8">
-        <title>threads.html</title>
+        <title>objectracker.html</title>
         <style type="text/css">
           .end-element { fill : #FFCCFF; }
         </style>
@@ -205,42 +205,112 @@ function base64ToSvgDocument(base64) {
         </script>
     </head>
     <body>
-        <div><textarea id="code" style="width: 100%;" rows="11">op2=>operation: 'Threading primitives for the network package'
-op4=>operation: import logging
-op6=>operation: import random
-op8=>operation: import threading
-op10=>operation: from contextlib import contextmanager
-op12=>operation: class StoppableThread(threading.Thread):
-    'Base class for application threads with stopThread method'
-    name = None
-    logger = logging.getLogger('default')
+        <div><textarea id="code" style="width: 100%;" rows="11">op2=>operation: '\nModule for tracking objects\n'
+op4=>operation: import time
+op6=>operation: from threading import RLock
+op8=>operation: import connectionpool
+op10=>operation: from network import dandelion_ins
+op12=>operation: from randomtrackingdict import RandomTrackingDict
+op14=>operation: haveBloom = False
+op16=>operation: try:
+    from pybloomfilter import BloomFilter
+    haveBloom = True
+except ImportError:
+    try:
+        from pybloom import BloomFilter
+        haveBloom = True
+    except ImportError:
+        pass
+op18=>operation: haveBloom = False
+op20=>operation: missingObjects = {}
+op22=>operation: class ObjectTracker(object):
+    'Object tracker mixin'
+    invCleanPeriod = 300
+    invInitialCapacity = 50000
+    invErrorRate = 0.03
+    trackingExpires = 3600
+    initialTimeOffset = 60
 
-    def __init__(self, name=None):
-        if name:
-            self.name = name
-        super(StoppableThread, self).__init__(name=self.name)
-        self.stop = threading.Event()
-        self._stopped = False
-        random.seed()
-        self.logger.info('Init thread %s', self.name)
+    def __init__(self):
+        self.objectsNewToMe = RandomTrackingDict()
+        self.objectsNewToThem = {}
+        self.objectsNewToThemLock = RLock()
+        self.initInvBloom()
+        self.initAddrBloom()
+        self.lastCleaned = time.time()
 
-    def stopThread(self):
-        'Stop the thread'
-        self._stopped = True
-        self.stop.set()
-op14=>operation: class BusyError(threading.ThreadError):
-    '\n    Thread error raised when another connection holds the lock\n    we are trying to acquire.\n    '
-    pass
-st17=>start: start nonBlocking
-io19=>inputoutput: input: lock
-op22=>operation: '\n    A context manager which acquires given lock non-blocking\n    and raises BusyError if failed to acquire.\n    '
-op24=>operation: locked = lock.acquire(False)
-cond27=>operation: raise BusyError if  (not locked)
-op37=>operation: try:
-    (yield)
-finally:
-    lock.release()
-e39=>end: end nonBlocking
+    def initInvBloom(self):
+        'Init bloom filter for tracking. WIP.'
+        if haveBloom:
+            self.invBloom = BloomFilter(capacity=ObjectTracker.invInitialCapacity, error_rate=ObjectTracker.invErrorRate)
+
+    def initAddrBloom(self):
+        'Init bloom filter for tracking addrs, WIP.\n        This either needs to be moved to addrthread.py or removed.'
+        if haveBloom:
+            self.addrBloom = BloomFilter(capacity=ObjectTracker.invInitialCapacity, error_rate=ObjectTracker.invErrorRate)
+
+    def clean(self):
+        'Clean up tracking to prevent memory bloat'
+        if (self.lastCleaned < (time.time() - ObjectTracker.invCleanPeriod)):
+            if haveBloom:
+                if (missingObjects == 0):
+                    self.initInvBloom()
+                self.initAddrBloom()
+            else:
+                deadline = (time.time() - ObjectTracker.trackingExpires)
+                with self.objectsNewToThemLock:
+                    self.objectsNewToThem = {k: v for (k, v) in self.objectsNewToThem.iteritems() if (v >= deadline)}
+            self.lastCleaned = time.time()
+
+    def hasObj(self, hashid):
+        'Do we already have object?'
+        if haveBloom:
+            return (hashid in self.invBloom)
+        return (hashid in self.objectsNewToMe)
+
+    def handleReceivedInventory(self, hashId):
+        'Handling received inventory'
+        if haveBloom:
+            self.invBloom.add(hashId)
+        try:
+            with self.objectsNewToThemLock:
+                del self.objectsNewToThem[hashId]
+        except KeyError:
+            pass
+        if (hashId not in missingObjects):
+            missingObjects[hashId] = time.time()
+        self.objectsNewToMe[hashId] = True
+
+    def handleReceivedObject(self, streamNumber, hashid):
+        'Handling received object'
+        for i in connectionpool.pool.connections():
+            if (not i.fullyEstablished):
+                continue
+            try:
+                del i.objectsNewToMe[hashid]
+            except KeyError:
+                if ((streamNumber in i.streams) and ((not dandelion_ins.hasHash(hashid)) or (dandelion_ins.objectChildStem(hashid) == i))):
+                    with i.objectsNewToThemLock:
+                        i.objectsNewToThem[hashid] = time.time()
+                    dandelion_ins.setHashStream(hashid, streamNumber)
+            if (i == self):
+                try:
+                    with i.objectsNewToThemLock:
+                        del i.objectsNewToThem[hashid]
+                except KeyError:
+                    pass
+        self.objectsNewToMe.setLastObject()
+
+    def hasAddr(self, addr):
+        'WIP, should be moved to addrthread.py or removed'
+        if haveBloom:
+            return (addr in self.invBloom)
+        return None
+
+    def addAddr(self, hashid):
+        'WIP, should be moved to addrthread.py or removed'
+        if haveBloom:
+            self.addrBloom.add(hashid)
 
 op2->op4
 op4->op6
@@ -248,13 +318,10 @@ op6->op8
 op8->op10
 op10->op12
 op12->op14
-op14->st17
-st17->io19
-io19->op22
-op22->op24
-op24->cond27
-cond27->op37
-op37->e39
+op14->op16
+op16->op18
+op18->op20
+op20->op22
 </textarea></div>
         <div><button id="run" type="button">Run</button> <button onclick="HelpText()">Format Help</button></div>
         <div id="HelpTextBlock" style="display:none"><br/>Conditions can also be redirected like cond(yes, bottom) or cond(yes, right)

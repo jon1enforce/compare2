@@ -2,7 +2,7 @@
 <html lang="en">
     <head>
         <meta charset="utf-8">
-        <title>threads.html</title>
+        <title>uploadthread.html</title>
         <style type="text/css">
           .end-element { fill : #FFCCFF; }
         </style>
@@ -205,42 +205,57 @@ function base64ToSvgDocument(base64) {
         </script>
     </head>
     <body>
-        <div><textarea id="code" style="width: 100%;" rows="11">op2=>operation: 'Threading primitives for the network package'
-op4=>operation: import logging
+        <div><textarea id="code" style="width: 100%;" rows="11">op2=>operation: '\n`UploadThread` class definition\n'
+op4=>operation: import time
 op6=>operation: import random
-op8=>operation: import threading
-op10=>operation: from contextlib import contextmanager
-op12=>operation: class StoppableThread(threading.Thread):
-    'Base class for application threads with stopThread method'
-    name = None
-    logger = logging.getLogger('default')
+op8=>operation: import protocol
+op10=>operation: import state
+op12=>operation: import connectionpool
+op14=>operation: from randomtrackingdict import RandomTrackingDict
+op16=>operation: from network import dandelion_ins
+op18=>operation: from threads import StoppableThread
+op20=>operation: class UploadThread(StoppableThread):
+    '\n    This is a thread that uploads the objects that the peers requested from me\n    '
+    maxBufSize = 2097152
+    name = 'Uploader'
 
-    def __init__(self, name=None):
-        if name:
-            self.name = name
-        super(StoppableThread, self).__init__(name=self.name)
-        self.stop = threading.Event()
-        self._stopped = False
-        random.seed()
-        self.logger.info('Init thread %s', self.name)
-
-    def stopThread(self):
-        'Stop the thread'
-        self._stopped = True
-        self.stop.set()
-op14=>operation: class BusyError(threading.ThreadError):
-    '\n    Thread error raised when another connection holds the lock\n    we are trying to acquire.\n    '
-    pass
-st17=>start: start nonBlocking
-io19=>inputoutput: input: lock
-op22=>operation: '\n    A context manager which acquires given lock non-blocking\n    and raises BusyError if failed to acquire.\n    '
-op24=>operation: locked = lock.acquire(False)
-cond27=>operation: raise BusyError if  (not locked)
-op37=>operation: try:
-    (yield)
-finally:
-    lock.release()
-e39=>end: end nonBlocking
+    def run(self):
+        while (not self._stopped):
+            uploaded = 0
+            connections = connectionpool.pool.establishedConnections()
+            random.shuffle(connections)
+            for i in connections:
+                now = time.time()
+                if (i.skipUntil >= now):
+                    continue
+                if (len(i.write_buf) > self.maxBufSize):
+                    continue
+                try:
+                    request = i.pendingUpload.randomKeys(RandomTrackingDict.maxPending)
+                except KeyError:
+                    continue
+                payload = bytearray()
+                chunk_count = 0
+                for chunk in request:
+                    del i.pendingUpload[chunk]
+                    if (dandelion_ins.hasHash(chunk) and (i != dandelion_ins.objectChildStem(chunk))):
+                        i.antiIntersectionDelay()
+                        self.logger.info("%s asked for a stem object we didn't offer to it.", i.destination)
+                        break
+                    try:
+                        payload.extend(protocol.CreatePacket('object', state.Inventory[chunk].payload))
+                        chunk_count += 1
+                    except KeyError:
+                        i.antiIntersectionDelay()
+                        self.logger.info("%s asked for an object we don't have.", i.destination)
+                        break
+                if (not chunk_count):
+                    continue
+                i.append_write_buf(payload)
+                self.logger.debug('%s:%i Uploading %i objects', i.destination.host, i.destination.port, chunk_count)
+                uploaded += chunk_count
+            if (not uploaded):
+                self.stop.wait(1)
 
 op2->op4
 op4->op6
@@ -248,13 +263,9 @@ op6->op8
 op8->op10
 op10->op12
 op12->op14
-op14->st17
-st17->io19
-io19->op22
-op22->op24
-op24->cond27
-cond27->op37
-op37->e39
+op14->op16
+op16->op18
+op18->op20
 </textarea></div>
         <div><button id="run" type="button">Run</button> <button onclick="HelpText()">Format Help</button></div>
         <div id="HelpTextBlock" style="display:none"><br/>Conditions can also be redirected like cond(yes, bottom) or cond(yes, right)

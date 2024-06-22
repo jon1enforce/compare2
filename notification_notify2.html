@@ -2,7 +2,7 @@
 <html lang="en">
     <head>
         <meta charset="utf-8">
-        <title>threads.html</title>
+        <title>notification_notify2.html</title>
         <style type="text/css">
           .end-element { fill : #FFCCFF; }
         </style>
@@ -205,56 +205,32 @@ function base64ToSvgDocument(base64) {
         </script>
     </head>
     <body>
-        <div><textarea id="code" style="width: 100%;" rows="11">op2=>operation: 'Threading primitives for the network package'
-op4=>operation: import logging
-op6=>operation: import random
-op8=>operation: import threading
-op10=>operation: from contextlib import contextmanager
-op12=>operation: class StoppableThread(threading.Thread):
-    'Base class for application threads with stopThread method'
-    name = None
-    logger = logging.getLogger('default')
-
-    def __init__(self, name=None):
-        if name:
-            self.name = name
-        super(StoppableThread, self).__init__(name=self.name)
-        self.stop = threading.Event()
-        self._stopped = False
-        random.seed()
-        self.logger.info('Init thread %s', self.name)
-
-    def stopThread(self):
-        'Stop the thread'
-        self._stopped = True
-        self.stop.set()
-op14=>operation: class BusyError(threading.ThreadError):
-    '\n    Thread error raised when another connection holds the lock\n    we are trying to acquire.\n    '
-    pass
-st17=>start: start nonBlocking
-io19=>inputoutput: input: lock
-op22=>operation: '\n    A context manager which acquires given lock non-blocking\n    and raises BusyError if failed to acquire.\n    '
-op24=>operation: locked = lock.acquire(False)
-cond27=>operation: raise BusyError if  (not locked)
-op37=>operation: try:
-    (yield)
-finally:
-    lock.release()
-e39=>end: end nonBlocking
+        <div><textarea id="code" style="width: 100%;" rows="11">op2=>operation: '\nNotification plugin using notify2\n'
+op4=>operation: import gi
+sub6=>subroutine: gi.require_version('Notify', '0.7')
+op8=>operation: from gi.repository import Notify
+sub10=>subroutine: Notify.init('pybitmessage')
+st13=>start: start connect_plugin
+io15=>inputoutput: input: title, subtitle, category, _, icon
+op18=>operation: 'Plugin for notify2'
+cond21=>operation: icon = ('mail-message-new' if (category == 2) else 'pybitmessage') if  (not icon)
+sub31=>subroutine: connect_plugin.notification.update(title, subtitle, icon)
+sub33=>subroutine: connect_plugin.notification.show()
+e35=>end: end connect_plugin
+op38=>operation: connect_plugin.notification = Notify.Notification.new('Init', 'Init')
 
 op2->op4
-op4->op6
-op6->op8
-op8->op10
-op10->op12
-op12->op14
-op14->st17
-st17->io19
-io19->op22
-op22->op24
-op24->cond27
-cond27->op37
-op37->e39
+op4->sub6
+sub6->op8
+op8->sub10
+sub10->st13
+st13->io15
+io15->op18
+op18->cond21
+cond21->sub31
+sub31->sub33
+sub33->e35
+e35->op38
 </textarea></div>
         <div><button id="run" type="button">Run</button> <button onclick="HelpText()">Format Help</button></div>
         <div id="HelpTextBlock" style="display:none"><br/>Conditions can also be redirected like cond(yes, bottom) or cond(yes, right)

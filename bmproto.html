@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <title>bmproto.html</title>
+        <style type="text/css">
+          .end-element { fill : #FFCCFF; }
+        </style>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/raphael/2.3.0/raphael.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/flowchart/1.17.1/flowchart.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.1/js/bootstrap.bundle.min.js"></script>
+        <!-- <script src="../release/flowchart.min.js"></script> -->
+        <script>
+
+            window.onload = function () {
+                var btn = document.getElementById("run"),
+                    cd = document.getElementById("code"),
+                    chart;
+                    
+                (btn.onclick = function () {
+                    var code = cd.value;
+
+                    if (chart) {
+                      chart.clean();
+                    }
+
+                    chart = flowchart.parse(code);
+                    chart.drawSVG('canvas', {
+                      'x': 0,
+                      'y': 0,
+                      'line-width': 3,
+                      //'maxWidth': 15,//ensures the flowcharts fits within a certain width
+                      'line-length': 50,
+                      'text-margin': 10,
+                      'font-size': 14,
+                      'font': 'normal',
+                      'font-family': 'Helvetica',
+                      'font-weight': 'normal',
+                      'font-color': 'black',
+                      'line-color': 'black',
+                      'element-color': 'black',
+                      'fill': 'white',
+                      'yes-text': 'yes',
+                      'no-text': 'no',
+                      'arrow-end': 'block',
+                      'scale': 1,
+                      'symbols': {
+                        'start': {
+                          'font-size': 14,
+                          'font-color': 'yellow',
+                          'element-color': 'blue',
+                          'fill': 'green',
+                          'class': 'start-element'
+                        },
+                        'inputoutput': {
+                          'font-color': 'black',
+                          'element-color': 'black',
+                          'fill': 'bisque'
+                        },
+                        'operation': {
+                          'font-color': 'black',
+                          'element-color': 'black',
+                          'fill': 'linen'
+                        },
+                        'subroutine': {
+                          'font-color': 'black',
+                          'element-color': 'blue',
+                          'fill': 'lightgreen'
+                        },
+                        'condition': {
+                          'font-color': 'red',
+                          'element-color': 'black',
+                          'fill': 'yellow'
+                        },
+                        'end':{
+                          'font-size': 20,
+                          'class': 'end-element'
+                        }
+                      },
+                      'flowstate' : {
+                        //'past' : { 'fill' : '#CCCCCC', 'font-size' : 12},
+                        //'current' : {'fill' : 'yellow', 'font-color' : 'red', 'font-weight' : 'bold'},
+                        //'future' : { 'fill' : '#FFFF99'},
+                        'request' : { 'fill' : 'blue'},
+                        'invalid': {'fill' : '#444444'},
+                        'approved' : { 'fill' : '#58C4A3', 'font-size' : 12, 'yes-text' : 'APPROVED', 'no-text' : 'n/a' },
+                        'rejected' : { 'fill' : '#C45879', 'font-size' : 12, 'yes-text' : 'n/a', 'no-text' : 'REJECTED' }
+                      }
+                    });
+                    //create base64 encoding of SVG to generate download link for title(without html or htm).SVG
+                    var currentCanvasDIV = document.getElementById('canvas')
+                    var currentDrawSVG = currentCanvasDIV.innerHTML.replaceAll('ë','e');
+
+                    const OUTsvgBASE64 = btoa(currentDrawSVG)
+                    doctitle = document.title.replace('.html','');
+                    doctitle = doctitle.replace('.htm','');
+
+
+                    var currentCanvasDIV = document.getElementById('canvas')
+                    var currentDrawSVG = currentCanvasDIV.innerHTML.replaceAll('ë','e');
+                    svgSource = currentDrawSVG
+                    svgXML = currentDrawSVG;
+                    // Use SVG Height and Width from the SVG XML to set canvas size
+                    svgXMLsubstringHeight = svgXML.substring(svgXML.indexOf('height='), svgXML.indexOf('version='));
+                    svgXMLsubstringWidth = svgXML.substring(svgXML.indexOf('width='), svgXML.indexOf('xmlns='));
+                    HeightValue = svgXMLsubstringHeight.substring(svgXMLsubstringHeight.indexOf('"')+1,svgXMLsubstringHeight.lastIndexOf('"'));
+                    WidthValue = svgXMLsubstringWidth.substring(svgXMLsubstringWidth.indexOf('"')+1,svgXMLsubstringWidth.lastIndexOf('"'));
+                    HeightValueInt = Math.round(HeightValue)
+                    WidthValueInt = Math.round(WidthValue)
+                    // setup input for base64SvgToBase64Png
+                    let svgSrc = "data:image/svg+xml;base64,"+OUTsvgBASE64;
+                    var pngBase
+                    imageUtil.base64SvgToBase64Png(svgSrc, WidthValueInt, HeightValueInt).then(pngSrc => {
+                    pngBase = pngSrc
+                    // output download link for base64 PNG converted on download from base64
+                    var pngOutHtml = `<a href="${pngBase}" download="${doctitle}.png">PNG - Click here to download current rendered flowchart as ${doctitle}.png</a>`
+                    document.getElementById("pngbase64").innerHTML=pngOutHtml;
+                    });    
+                    // output download link for base64 SVG converted on download from base64
+                    var svgOutHtml = `<a href="data:image/svg+xml;base64,${OUTsvgBASE64}" download=${doctitle}.svg>SVG - Click here to download current rendered flowchart as ${doctitle}.svg</a> `
+                        document.getElementById("svgbase64").innerHTML=svgOutHtml;
+                    })();
+
+                            };
+                 
+
+// derived from https://stackoverflow.com/a/64800570
+// we need to use web browser canvas to generate a image. In this case png
+let imageUtil = {};
+/**
+ * converts a base64 encoded data url SVG image to a PNG image
+ * @param originalBase64 data url of svg image
+ * @param width target width in pixel of PNG image
+ * @param secondTry used internally to prevent endless recursion
+ * @return {Promise<unknown>} resolves to png data url of the image
+ */
+imageUtil.base64SvgToBase64Png = function (originalBase64, width, height, secondTry) {
+    return new Promise(resolve => {
+        let img = document.createElement('img');
+        img.onload = function () {
+            if (!secondTry && (img.naturalWidth === 0 || img.naturalHeight === 0)) {
+                let svgDoc = base64ToSvgDocument(originalBase64);
+                let fixedDoc = fixSvgDocumentFF(svgDoc);
+                return imageUtil.base64SvgToBase64Png(svgDocumentToBase64(fixedDoc), width, height, true).then(result => {
+                    resolve(result);
+                });
+            }
+            //document.body.appendChild(img);
+            let canvas2 = document.createElement("canvas");
+            //document.body.removeChild(img);
+            canvas2.width = width;
+            canvas2.height = height;
+            let ctx = canvas2.getContext("2d");
+            ctx.drawImage(img, 0, 0, canvas2.width, canvas2.height);
+            try {
+                let data = canvas2.toDataURL('image/png');
+                resolve(data);
+            } catch (e) {
+                resolve(null);
+            }
+        };
+        img.src = originalBase64;
+    });
+}
+
+//needed because Firefox doesn't correctly handle SVG with size = 0, see https://bugzilla.mozilla.org/show_bug.cgi?id=700533
+function fixSvgDocumentFF(svgDocument) {
+    try {
+        let widthInt = parseInt(svgDocument.documentElement.width.baseVal.value) || 500;
+        let heightInt = parseInt(svgDocument.documentElement.height.baseVal.value) || 500;
+        svgDocument.documentElement.width.baseVal.newValueSpecifiedUnits(SVGLength.SVG_LENGTHTYPE_PX, widthInt);
+        svgDocument.documentElement.height.baseVal.newValueSpecifiedUnits(SVGLength.SVG_LENGTHTYPE_PX, heightInt);
+        return svgDocument;
+    } catch (e) {
+        return svgDocument;
+    }
+}
+
+function svgDocumentToBase64(svgDocument) {
+    try {
+        let base64EncodedSVG = btoa(new XMLSerializer().serializeToString(svgDocument));
+        return 'data:image/svg+xml;base64,' + base64EncodedSVG;
+    } catch (e) {
+        return null;
+    }
+}
+
+function base64ToSvgDocument(base64) {
+    let svg = atob(base64.substring(base64.indexOf('base64,') + 7));
+    svg = svg.substring(svg.indexOf('<svg'));
+    let parser = new DOMParser();
+    return parser.parseFromString(svg, "image/svg+xml");
+} 
+        </script>
+
+        <script>
+            function HelpText() {
+              var x = document.getElementById("HelpTextBlock");
+              if (x.style.display === "none") {
+                x.style.display = "block";
+              } else {
+                x.style.display = "none";
+              }
+            }
+        </script>
+    </head>
+    <body>
+        <div><textarea id="code" style="width: 100%;" rows="11">op2=>operation: "\nClass BMProto defines bitmessage's network protocol workflow.\n"
+op4=>operation: import base64
+op6=>operation: import hashlib
+op8=>operation: import logging
+op10=>operation: import re
+op12=>operation: import socket
+op14=>operation: import struct
+op16=>operation: import time
+op18=>operation: import addresses
+op20=>operation: import knownnodes
+op22=>operation: import protocol
+op24=>operation: import state
+op26=>operation: import connectionpool
+op28=>operation: from bmconfigparser import config
+op30=>operation: from queues import invQueue, objectProcessorQueue, portCheckerQueue
+op32=>operation: from randomtrackingdict import RandomTrackingDict
+op34=>operation: from network.advanceddispatcher import AdvancedDispatcher
+op36=>operation: from network.bmobject import BMObject, BMObjectAlreadyHaveError, BMObjectExpiredError, BMObjectInsufficientPOWError, BMObjectInvalidError, BMObjectUnwantedStreamError
+op38=>operation: from network.proxy import ProxyError
+op40=>operation: from network import dandelion_ins
+op42=>operation: from node import Node, Peer
+op44=>operation: from objectracker import ObjectTracker, missingObjects
+op46=>operation: logger = logging.getLogger('default')
+op48=>operation: class BMProtoError(ProxyError):
+    'A Bitmessage Protocol Base Error'
+    errorCodes = 'Protocol error'
+op50=>operation: class BMProtoInsufficientDataError(BMProtoError):
+    'A Bitmessage Protocol Insufficient Data Error'
+    errorCodes = 'Insufficient data'
+op52=>operation: class BMProtoExcessiveDataError(BMProtoError):
+    'A Bitmessage Protocol Excessive Data Error'
+    errorCodes = 'Too much data'
+op54=>operation: class BMProto(AdvancedDispatcher, ObjectTracker):
+    'A parser for the Bitmessage Protocol'
+    timeOffsetWrongCount = 0
+
+    def __init__(self, address=None, sock=None):
+        AdvancedDispatcher.__init__(self, sock)
+        self.isOutbound = False
+        self.local = False
+        self.pendingUpload = RandomTrackingDict()
+        self.network_group = None
+        self.userAgent = ''
+
+    def bm_proto_reset(self):
+        'Reset the bitmessage object parser'
+        self.magic = None
+        self.command = None
+        self.payloadLength = 0
+        self.checksum = None
+        self.payload = None
+        self.invalid = False
+        self.payloadOffset = 0
+        self.expectBytes = protocol.Header.size
+        self.object = None
+
+    def state_bm_header(self):
+        'Process incoming header'
+        (self.magic, self.command, self.payloadLength, self.checksum) = protocol.Header.unpack(self.read_buf[:protocol.Header.size])
+        self.command = self.command.rstrip('\x00')
+        if (self.magic != protocol.magic):
+            self.set_state('bm_header', length=1)
+            self.bm_proto_reset()
+            logger.debug('Bad magic')
+            if (self.socket.type == socket.SOCK_STREAM):
+                self.close_reason = 'Bad magic'
+                self.set_state('close')
+            return False
+        if (self.payloadLength > protocol.MAX_MESSAGE_SIZE):
+            self.invalid = True
+        self.set_state('bm_command', length=protocol.Header.size, expectBytes=self.payloadLength)
+        return True
+
+    def state_bm_command(self):
+        'Process incoming command'
+        self.payload = self.read_buf[:self.payloadLength]
+        if (self.checksum != hashlib.sha512(self.payload).digest()[0:4]):
+            logger.debug('Bad checksum, ignoring')
+            self.invalid = True
+        retval = True
+        if ((not self.fullyEstablished) and (self.command not in ('error', 'version', 'verack'))):
+            logger.error('Received command %s before connection was fully established, ignoring', self.command)
+            self.invalid = True
+        if (not self.invalid):
+            try:
+                retval = getattr(self, ('bm_command_' + str(self.command).lower()))()
+            except AttributeError:
+                logger.debug('unimplemented command %s', self.command)
+            except BMProtoInsufficientDataError:
+                logger.debug('packet length too short, skipping')
+            except BMProtoExcessiveDataError:
+                logger.debug('too much data, skipping')
+            except BMObjectInsufficientPOWError:
+                logger.debug('insufficient PoW, skipping')
+            except BMObjectExpiredError:
+                logger.debug('object expired, skipping')
+            except BMObjectUnwantedStreamError:
+                logger.debug('object not in wanted stream, skipping')
+            except BMObjectInvalidError:
+                logger.debug('object invalid, skipping')
+            except BMObjectAlreadyHaveError:
+                logger.debug('%(host)s:%(port)i already got object, skipping', self.destination._asdict())
+            except struct.error:
+                logger.debug('decoding error, skipping')
+        elif (self.socket.type == socket.SOCK_DGRAM):
+            pass
+        else:
+            logger.debug('Closing due to invalid command %s', self.command)
+            self.close_reason = ('Invalid command %s' % self.command)
+            self.set_state('close')
+            return False
+        if retval:
+            self.set_state('bm_header', length=self.payloadLength)
+            self.bm_proto_reset()
+        return True
+
+    def decode_payload_string(self, length):
+        'Read and return `length` bytes from payload'
+        value = self.payload[self.payloadOffset:(self.payloadOffset + length)]
+        self.payloadOffset += length
+        return value
+
+    def decode_payload_varint(self):
+        'Decode a varint from the payload'
+        (value, offset) = addresses.decodeVarint(self.payload[self.payloadOffset:])
+        self.payloadOffset += offset
+        return value
+
+    def decode_payload_node(self):
+        'Decode node details from the payload'
+        (services, host, port) = self.decode_payload_content('Q16sH')
+        if (host[0:12] == '\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00ÿÿ'):
+            host = socket.inet_ntop(socket.AF_INET, str(host[12:16]))
+        elif (host[0:6] == 'ý\x87Ø~ëC'):
+            host = (base64.b32encode(host[6:]).lower() + '.onion')
+        else:
+            host = socket.inet_ntop(socket.AF_INET6, str(host))
+        if (host == ''):
+            host = socket.inet_ntop(socket.AF_INET, str(host[12:16]))
+        return Node(services, host, port)
+
+    def decode_payload_content(self, pattern='v'):
+        '\n        Decode the payload depending on pattern:\n\n        L = varint indicating the length of the next array\n        l = varint indicating the length of the next item\n        v = varint (or array)\n        H = uint16\n        I = uint32\n        Q = uint64\n        i = net_addr (without time and stream number)\n        s = string\n        0-9 = length of the next item\n        , = end of array\n        '
+
+        def decode_simple(self, char='v'):
+            'Decode the payload using one char pattern'
+            if (char == 'v'):
+                return self.decode_payload_varint()
+            if (char == 'i'):
+                return self.decode_payload_node()
+            if (char == 'H'):
+                self.payloadOffset += 2
+                return struct.unpack('>H', self.payload[(self.payloadOffset - 2):self.payloadOffset])[0]
+            if (char == 'I'):
+                self.payloadOffset += 4
+                return struct.unpack('>I', self.payload[(self.payloadOffset - 4):self.payloadOffset])[0]
+            if (char == 'Q'):
+                self.payloadOffset += 8
+                return struct.unpack('>Q', self.payload[(self.payloadOffset - 8):self.payloadOffset])[0]
+            return None
+        size = None
+        isArray = False
+        parserStack = [[1, 1, False, pattern, 0, []]]
+        while True:
+            i = parserStack[(- 1)][3][parserStack[(- 1)][4]]
+            if ((i in '0123456789') and ((size is None) or (parserStack[(- 1)][3][(parserStack[(- 1)][4] - 1)] not in 'lL'))):
+                try:
+                    size = ((size * 10) + int(i))
+                except TypeError:
+                    size = int(i)
+                isArray = False
+            elif ((i in 'Ll') and (size is None)):
+                size = self.decode_payload_varint()
+                isArray = (i == 'L')
+            elif (size is not None):
+                if isArray:
+                    parserStack.append([size, size, isArray, parserStack[(- 1)][3][parserStack[(- 1)][4]:], 0, []])
+                    parserStack[(- 2)][4] = len(parserStack[(- 2)][3])
+                else:
+                    j = 0
+                    for j in range(parserStack[(- 1)][4], len(parserStack[(- 1)][3])):
+                        if (parserStack[(- 1)][3][j] not in 'lL0123456789'):
+                            break
+                    parserStack.append([size, size, isArray, parserStack[(- 1)][3][parserStack[(- 1)][4]:(j + 1)], 0, []])
+                    parserStack[(- 2)][4] += (len(parserStack[(- 1)][3]) - 1)
+                size = None
+                continue
+            elif (i == 's'):
+                parserStack[(- 1)][5] = self.payload[self.payloadOffset:(self.payloadOffset + parserStack[(- 1)][0])]
+                self.payloadOffset += parserStack[(- 1)][0]
+                parserStack[(- 1)][1] = 0
+                parserStack[(- 1)][2] = True
+                size = None
+            elif (i in 'viHIQ'):
+                parserStack[(- 1)][5].append(decode_simple(self, parserStack[(- 1)][3][parserStack[(- 1)][4]]))
+                size = None
+            else:
+                size = None
+            for depth in range((len(parserStack) - 1), (- 1), (- 1)):
+                parserStack[depth][4] += 1
+                if (parserStack[depth][4] >= len(parserStack[depth][3])):
+                    parserStack[depth][1] -= 1
+                    parserStack[depth][4] = 0
+                    if (depth > 0):
+                        if parserStack[depth][2]:
+                            parserStack[(depth - 1)][5].append(parserStack[depth][5])
+                        else:
+                            parserStack[(depth - 1)][5].extend(parserStack[depth][5])
+                        parserStack[depth][5] = []
+                    if (parserStack[depth][1] <= 0):
+                        if (depth == 0):
+                            return parserStack[depth][5]
+                        del parserStack[(- 1)]
+                        continue
+                    break
+                break
+        if (self.payloadOffset > self.payloadLength):
+            logger.debug('Insufficient data %i/%i', self.payloadOffset, self.payloadLength)
+            raise BMProtoInsufficientDataError()
+
+    def bm_command_error(self):
+        'Decode an error message and log it'
+        err_values = self.decode_payload_content('vvlsls')
+        fatalStatus = err_values[0]
+        errorText = err_values[3]
+        logger.error('%s:%i error: %i, %s', self.destination.host, self.destination.port, fatalStatus, errorText)
+        return True
+
+    def bm_command_getdata(self):
+        '\n        Incoming request for object(s).\n        If we have them and some other conditions are fulfilled,\n        append them to the write queue.\n        '
+        items = self.decode_payload_content('l32s')
+        now = time.time()
+        if (now < self.skipUntil):
+            return True
+        for i in items:
+            self.pendingUpload[str(i)] = now
+        return True
+
+    def _command_inv(self, extend_dandelion_stem=False):
+        '\n        Common inv announce implementation:\n        both inv and dinv depending on *extend_dandelion_stem* kwarg\n        '
+        items = self.decode_payload_content('l32s')
+        if (len(items) > protocol.MAX_OBJECT_COUNT):
+            logger.error('Too many items in %sinv message!', ('d' if extend_dandelion_stem else ''))
+            raise BMProtoExcessiveDataError()
+        if (extend_dandelion_stem and (not dandelion_ins.enabled)):
+            return True
+        for i in map(str, items):
+            if ((i in state.Inventory) and (not dandelion_ins.hasHash(i))):
+                continue
+            if (extend_dandelion_stem and (not dandelion_ins.hasHash(i))):
+                dandelion_ins.addHash(i, self)
+            self.handleReceivedInventory(i)
+        return True
+
+    def bm_command_inv(self):
+        'Non-dandelion announce'
+        return self._command_inv(False)
+
+    def bm_command_dinv(self):
+        'Dandelion stem announce'
+        return self._command_inv(True)
+
+    def bm_command_object(self):
+        'Incoming object, process it'
+        objectOffset = self.payloadOffset
+        (nonce, expiresTime, objectType, version, streamNumber) = self.decode_payload_content('QQIvv')
+        self.object = BMObject(nonce, expiresTime, objectType, version, streamNumber, self.payload, self.payloadOffset)
+        payload_len = (len(self.payload) - self.payloadOffset)
+        if (payload_len > protocol.MAX_OBJECT_PAYLOAD_SIZE):
+            logger.info('The payload length of this object is too large (%d bytes). Ignoring it.', payload_len)
+            raise BMProtoExcessiveDataError()
+        try:
+            self.object.checkProofOfWorkSufficient()
+            self.object.checkEOLSanity()
+            self.object.checkAlreadyHave()
+        except (BMObjectExpiredError, BMObjectAlreadyHaveError, BMObjectInsufficientPOWError):
+            BMProto.stopDownloadingObject(self.object.inventoryHash)
+            raise
+        try:
+            self.object.checkStream()
+        except BMObjectUnwantedStreamError:
+            acceptmismatch = config.getboolean('inventory', 'acceptmismatch')
+            BMProto.stopDownloadingObject(self.object.inventoryHash, acceptmismatch)
+            if (not acceptmismatch):
+                raise
+        except BMObjectInvalidError:
+            BMProto.stopDownloadingObject(self.object.inventoryHash)
+            raise
+        try:
+            self.object.checkObjectByType()
+            objectProcessorQueue.put((self.object.objectType, buffer(self.object.data)))
+        except BMObjectInvalidError:
+            BMProto.stopDownloadingObject(self.object.inventoryHash, True)
+        else:
+            try:
+                del missingObjects[self.object.inventoryHash]
+            except KeyError:
+                pass
+        if ((self.object.inventoryHash in state.Inventory) and dandelion_ins.hasHash(self.object.inventoryHash)):
+            dandelion_ins.removeHash(self.object.inventoryHash, 'cycle detection')
+        state.Inventory[self.object.inventoryHash] = (self.object.objectType, self.object.streamNumber, buffer(self.payload[objectOffset:]), self.object.expiresTime, buffer(self.object.tag))
+        self.handleReceivedObject(self.object.streamNumber, self.object.inventoryHash)
+        invQueue.put((self.object.streamNumber, self.object.inventoryHash, self.destination))
+        return True
+
+    def _decode_addr(self):
+        return self.decode_payload_content('LQIQ16sH')
+
+    def bm_command_addr(self):
+        'Incoming addresses, process them'
+        for (seenTime, stream, _, ip, port) in self._decode_addr():
+            ip = str(ip)
+            if ((stream not in connectionpool.pool.streams) or ip.startswith('bootstrap')):
+                continue
+            decodedIP = protocol.checkIPAddress(ip)
+            if (decodedIP and ((time.time() - seenTime) > 0) and (seenTime > (time.time() - protocol.ADDRESS_ALIVE)) and (port > 0)):
+                peer = Peer(decodedIP, port)
+                with knownnodes.knownNodesLock:
+                    knownnodes.addKnownNode(stream, peer, seenTime)
+        return True
+
+    def bm_command_portcheck(self):
+        'Incoming port check request, queue it.'
+        portCheckerQueue.put(Peer(self.destination, self.peerNode.port))
+        return True
+
+    def bm_command_ping(self):
+        'Incoming ping, respond to it.'
+        self.append_write_buf(protocol.CreatePacket('pong'))
+        return True
+
+    @staticmethod
+    def bm_command_pong():
+        '\n        Incoming pong.\n        Ignore it. PyBitmessage pings connections after about 5 minutes\n        of inactivity, and leaves it to the TCP stack to handle actual\n        timeouts. So there is no need to do anything when a pong arrives.\n        '
+        return True
+
+    def bm_command_verack(self):
+        '\n        Incoming verack.\n        If already sent my own verack, handshake is complete (except\n        potentially waiting for buffers to flush), so we can continue\n        to the main connection phase. If not sent verack yet,\n        continue processing.\n        '
+        self.verackReceived = True
+        if (not self.verackSent):
+            return True
+        self.set_state(('tls_init' if self.isSSL else 'connection_fully_established'), length=self.payloadLength, expectBytes=0)
+        return False
+
+    def bm_command_version(self):
+        '\n        Incoming version.\n        Parse and log, remember important things, like streams, bitfields, etc.\n        '
+        decoded = self.decode_payload_content('IQQiiQlslv')
+        (self.remoteProtocolVersion, self.services, self.timestamp, self.sockNode, self.peerNode, self.nonce, self.userAgent) = decoded[:7]
+        self.streams = decoded[7:]
+        self.nonce = struct.pack('>Q', self.nonce)
+        self.timeOffset = (self.timestamp - int(time.time()))
+        logger.debug('remoteProtocolVersion: %i', self.remoteProtocolVersion)
+        logger.debug('services: 0x%08X', self.services)
+        logger.debug('time offset: %i', self.timeOffset)
+        logger.debug('my external IP: %s', self.sockNode.host)
+        logger.debug('remote node incoming address: %s:%i', self.destination.host, self.peerNode.port)
+        logger.debug('user agent: %s', self.userAgent)
+        logger.debug('streams: [%s]', ','.join(map(str, self.streams)))
+        if (not self.peerValidityChecks()):
+            return True
+        self.append_write_buf(protocol.CreatePacket('verack'))
+        self.verackSent = True
+        ua_valid = re.match('^/[a-zA-Z]+:[0-9]+\\.?[\\w\\s\\(\\)\\./:;-]*/$', self.userAgent)
+        if (not ua_valid):
+            self.userAgent = '/INVALID:0/'
+        if (not self.isOutbound):
+            self.append_write_buf(protocol.assembleVersionMessage(self.destination.host, self.destination.port, connectionpool.pool.streams, dandelion_ins.enabled, True, nodeid=self.nodeid))
+            logger.debug('%(host)s:%(port)i sending version', self.destination._asdict())
+        if (((self.services & protocol.NODE_SSL) == protocol.NODE_SSL) and protocol.haveSSL((not self.isOutbound))):
+            self.isSSL = True
+        if (not self.verackReceived):
+            return True
+        self.set_state(('tls_init' if self.isSSL else 'connection_fully_established'), length=self.payloadLength, expectBytes=0)
+        return False
+
+    def peerValidityChecks(self):
+        'Check the validity of the peer'
+        if (self.remoteProtocolVersion < 3):
+            self.append_write_buf(protocol.assembleErrorMessage(errorText='Your is using an old protocol. Closing connection.', fatal=2))
+            logger.debug('Closing connection to old protocol version %s, node: %s', self.remoteProtocolVersion, self.destination)
+            return False
+        if (self.timeOffset > protocol.MAX_TIME_OFFSET):
+            self.append_write_buf(protocol.assembleErrorMessage(errorText='Your time is too far in the future compared to mine. Closing connection.', fatal=2))
+            logger.info("%s's time is too far in the future (%s seconds). Closing connection to it.", self.destination, self.timeOffset)
+            BMProto.timeOffsetWrongCount += 1
+            return False
+        elif (self.timeOffset < (- protocol.MAX_TIME_OFFSET)):
+            self.append_write_buf(protocol.assembleErrorMessage(errorText='Your time is too far in the past compared to mine. Closing connection.', fatal=2))
+            logger.info("%s's time is too far in the past (timeOffset %s seconds). Closing connection to it.", self.destination, self.timeOffset)
+            BMProto.timeOffsetWrongCount += 1
+            return False
+        else:
+            BMProto.timeOffsetWrongCount = 0
+        if (not self.streams):
+            self.append_write_buf(protocol.assembleErrorMessage(errorText="We don't have shared stream interests. Closing connection.", fatal=2))
+            logger.debug('Closed connection to %s because there is no overlapping interest in streams.', self.destination)
+            return False
+        if connectionpool.pool.inboundConnections.get(self.destination):
+            try:
+                if (not protocol.checkSocksIP(self.destination.host)):
+                    self.append_write_buf(protocol.assembleErrorMessage(errorText='Too many connections from your IP. Closing connection.', fatal=2))
+                    logger.debug('Closed connection to %s because we are already connected to that IP.', self.destination)
+                    return False
+            except Exception:
+                pass
+        if (not self.isOutbound):
+            if ((Peer(self.destination.host, self.peerNode.port) in connectionpool.pool.inboundConnections) or (len(connectionpool.pool) > (config.safeGetInt('bitmessagesettings', 'maxtotalconnections') + config.safeGetInt('bitmessagesettings', 'maxbootstrapconnections')))):
+                self.append_write_buf(protocol.assembleErrorMessage(errorText='Server full, please try again later.', fatal=2))
+                logger.debug('Closed connection to %s due to server full or duplicate inbound/outbound.', self.destination)
+                return False
+        if connectionpool.pool.isAlreadyConnected(self.nonce):
+            self.append_write_buf(protocol.assembleErrorMessage(errorText="I'm connected to myself. Closing connection.", fatal=2))
+            logger.debug("Closed connection to %s because I'm connected to myself.", self.destination)
+            return False
+        return True
+
+    @staticmethod
+    def stopDownloadingObject(hashId, forwardAnyway=False):
+        'Stop downloading object *hashId*'
+        for connection in connectionpool.pool.connections():
+            try:
+                del connection.objectsNewToMe[hashId]
+            except KeyError:
+                pass
+            if (not forwardAnyway):
+                try:
+                    with connection.objectsNewToThemLock:
+                        del connection.objectsNewToThem[hashId]
+                except KeyError:
+                    pass
+        try:
+            del missingObjects[hashId]
+        except KeyError:
+            pass
+
+    def handle_close(self):
+        'Handle close'
+        self.set_state('close')
+        if (not (self.accepting or self.connecting or self.connected)):
+            return
+        try:
+            logger.debug('%s:%i: closing, %s', self.destination.host, self.destination.port, self.close_reason)
+        except AttributeError:
+            try:
+                logger.debug('%s:%i: closing', self.destination.host, self.destination.port)
+            except AttributeError:
+                logger.debug('Disconnected socket closing')
+        AdvancedDispatcher.handle_close(self)
+
+op2->op4
+op4->op6
+op6->op8
+op8->op10
+op10->op12
+op12->op14
+op14->op16
+op16->op18
+op18->op20
+op20->op22
+op22->op24
+op24->op26
+op26->op28
+op28->op30
+op30->op32
+op32->op34
+op34->op36
+op36->op38
+op38->op40
+op40->op42
+op42->op44
+op44->op46
+op46->op48
+op48->op50
+op50->op52
+op52->op54
+</textarea></div>
+        <div><button id="run" type="button">Run</button> <button onclick="HelpText()">Format Help</button></div>
+        <div id="HelpTextBlock" style="display:none"><br/>Conditions can also be redirected like cond(yes, bottom) or cond(yes, right)
+... and the other symbols too... like sub1(right)<br/>
+You can also tweak the <b>diagram.drawSVG('diagram', {});</b> script in this file for more changes<br/>
+This is based on <a href="https://github.com/adrai/flowchart.js">flowchart.js on github</a> and <a href="http://flowchart.js.org">http://flowchart.js.org</a> more documentation can be found over there.
+</div><br/><div id="svgbase64"></div>
+        <div id="pngbase64"></div>
+
+        <div id="canvas"></div>
+    </body>
+</html>
