@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <title>advanceddispatcher.html</title>
+        <style type="text/css">
+          .end-element { fill : #FFCCFF; }
+        </style>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/raphael/2.3.0/raphael.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/flowchart/1.17.1/flowchart.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.1/js/bootstrap.bundle.min.js"></script>
+        <!-- <script src="../release/flowchart.min.js"></script> -->
+        <script>
+
+            window.onload = function () {
+                var btn = document.getElementById("run"),
+                    cd = document.getElementById("code"),
+                    chart;
+                    
+                (btn.onclick = function () {
+                    var code = cd.value;
+
+                    if (chart) {
+                      chart.clean();
+                    }
+
+                    chart = flowchart.parse(code);
+                    chart.drawSVG('canvas', {
+                      'x': 0,
+                      'y': 0,
+                      'line-width': 3,
+                      //'maxWidth': 15,//ensures the flowcharts fits within a certain width
+                      'line-length': 50,
+                      'text-margin': 10,
+                      'font-size': 14,
+                      'font': 'normal',
+                      'font-family': 'Helvetica',
+                      'font-weight': 'normal',
+                      'font-color': 'black',
+                      'line-color': 'black',
+                      'element-color': 'black',
+                      'fill': 'white',
+                      'yes-text': 'yes',
+                      'no-text': 'no',
+                      'arrow-end': 'block',
+                      'scale': 1,
+                      'symbols': {
+                        'start': {
+                          'font-size': 14,
+                          'font-color': 'yellow',
+                          'element-color': 'blue',
+                          'fill': 'green',
+                          'class': 'start-element'
+                        },
+                        'inputoutput': {
+                          'font-color': 'black',
+                          'element-color': 'black',
+                          'fill': 'bisque'
+                        },
+                        'operation': {
+                          'font-color': 'black',
+                          'element-color': 'black',
+                          'fill': 'linen'
+                        },
+                        'subroutine': {
+                          'font-color': 'black',
+                          'element-color': 'blue',
+                          'fill': 'lightgreen'
+                        },
+                        'condition': {
+                          'font-color': 'red',
+                          'element-color': 'black',
+                          'fill': 'yellow'
+                        },
+                        'end':{
+                          'font-size': 20,
+                          'class': 'end-element'
+                        }
+                      },
+                      'flowstate' : {
+                        //'past' : { 'fill' : '#CCCCCC', 'font-size' : 12},
+                        //'current' : {'fill' : 'yellow', 'font-color' : 'red', 'font-weight' : 'bold'},
+                        //'future' : { 'fill' : '#FFFF99'},
+                        'request' : { 'fill' : 'blue'},
+                        'invalid': {'fill' : '#444444'},
+                        'approved' : { 'fill' : '#58C4A3', 'font-size' : 12, 'yes-text' : 'APPROVED', 'no-text' : 'n/a' },
+                        'rejected' : { 'fill' : '#C45879', 'font-size' : 12, 'yes-text' : 'n/a', 'no-text' : 'REJECTED' }
+                      }
+                    });
+                    //create base64 encoding of SVG to generate download link for title(without html or htm).SVG
+                    var currentCanvasDIV = document.getElementById('canvas')
+                    var currentDrawSVG = currentCanvasDIV.innerHTML.replaceAll('ë','e');
+
+                    const OUTsvgBASE64 = btoa(currentDrawSVG)
+                    doctitle = document.title.replace('.html','');
+                    doctitle = doctitle.replace('.htm','');
+
+
+                    var currentCanvasDIV = document.getElementById('canvas')
+                    var currentDrawSVG = currentCanvasDIV.innerHTML.replaceAll('ë','e');
+                    svgSource = currentDrawSVG
+                    svgXML = currentDrawSVG;
+                    // Use SVG Height and Width from the SVG XML to set canvas size
+                    svgXMLsubstringHeight = svgXML.substring(svgXML.indexOf('height='), svgXML.indexOf('version='));
+                    svgXMLsubstringWidth = svgXML.substring(svgXML.indexOf('width='), svgXML.indexOf('xmlns='));
+                    HeightValue = svgXMLsubstringHeight.substring(svgXMLsubstringHeight.indexOf('"')+1,svgXMLsubstringHeight.lastIndexOf('"'));
+                    WidthValue = svgXMLsubstringWidth.substring(svgXMLsubstringWidth.indexOf('"')+1,svgXMLsubstringWidth.lastIndexOf('"'));
+                    HeightValueInt = Math.round(HeightValue)
+                    WidthValueInt = Math.round(WidthValue)
+                    // setup input for base64SvgToBase64Png
+                    let svgSrc = "data:image/svg+xml;base64,"+OUTsvgBASE64;
+                    var pngBase
+                    imageUtil.base64SvgToBase64Png(svgSrc, WidthValueInt, HeightValueInt).then(pngSrc => {
+                    pngBase = pngSrc
+                    // output download link for base64 PNG converted on download from base64
+                    var pngOutHtml = `<a href="${pngBase}" download="${doctitle}.png">PNG - Click here to download current rendered flowchart as ${doctitle}.png</a>`
+                    document.getElementById("pngbase64").innerHTML=pngOutHtml;
+                    });    
+                    // output download link for base64 SVG converted on download from base64
+                    var svgOutHtml = `<a href="data:image/svg+xml;base64,${OUTsvgBASE64}" download=${doctitle}.svg>SVG - Click here to download current rendered flowchart as ${doctitle}.svg</a> `
+                        document.getElementById("svgbase64").innerHTML=svgOutHtml;
+                    })();
+
+                            };
+                 
+
+// derived from https://stackoverflow.com/a/64800570
+// we need to use web browser canvas to generate a image. In this case png
+let imageUtil = {};
+/**
+ * converts a base64 encoded data url SVG image to a PNG image
+ * @param originalBase64 data url of svg image
+ * @param width target width in pixel of PNG image
+ * @param secondTry used internally to prevent endless recursion
+ * @return {Promise<unknown>} resolves to png data url of the image
+ */
+imageUtil.base64SvgToBase64Png = function (originalBase64, width, height, secondTry) {
+    return new Promise(resolve => {
+        let img = document.createElement('img');
+        img.onload = function () {
+            if (!secondTry && (img.naturalWidth === 0 || img.naturalHeight === 0)) {
+                let svgDoc = base64ToSvgDocument(originalBase64);
+                let fixedDoc = fixSvgDocumentFF(svgDoc);
+                return imageUtil.base64SvgToBase64Png(svgDocumentToBase64(fixedDoc), width, height, true).then(result => {
+                    resolve(result);
+                });
+            }
+            //document.body.appendChild(img);
+            let canvas2 = document.createElement("canvas");
+            //document.body.removeChild(img);
+            canvas2.width = width;
+            canvas2.height = height;
+            let ctx = canvas2.getContext("2d");
+            ctx.drawImage(img, 0, 0, canvas2.width, canvas2.height);
+            try {
+                let data = canvas2.toDataURL('image/png');
+                resolve(data);
+            } catch (e) {
+                resolve(null);
+            }
+        };
+        img.src = originalBase64;
+    });
+}
+
+//needed because Firefox doesn't correctly handle SVG with size = 0, see https://bugzilla.mozilla.org/show_bug.cgi?id=700533
+function fixSvgDocumentFF(svgDocument) {
+    try {
+        let widthInt = parseInt(svgDocument.documentElement.width.baseVal.value) || 500;
+        let heightInt = parseInt(svgDocument.documentElement.height.baseVal.value) || 500;
+        svgDocument.documentElement.width.baseVal.newValueSpecifiedUnits(SVGLength.SVG_LENGTHTYPE_PX, widthInt);
+        svgDocument.documentElement.height.baseVal.newValueSpecifiedUnits(SVGLength.SVG_LENGTHTYPE_PX, heightInt);
+        return svgDocument;
+    } catch (e) {
+        return svgDocument;
+    }
+}
+
+function svgDocumentToBase64(svgDocument) {
+    try {
+        let base64EncodedSVG = btoa(new XMLSerializer().serializeToString(svgDocument));
+        return 'data:image/svg+xml;base64,' + base64EncodedSVG;
+    } catch (e) {
+        return null;
+    }
+}
+
+function base64ToSvgDocument(base64) {
+    let svg = atob(base64.substring(base64.indexOf('base64,') + 7));
+    svg = svg.substring(svg.indexOf('<svg'));
+    let parser = new DOMParser();
+    return parser.parseFromString(svg, "image/svg+xml");
+} 
+        </script>
+
+        <script>
+            function HelpText() {
+              var x = document.getElementById("HelpTextBlock");
+              if (x.style.display === "none") {
+                x.style.display = "block";
+              } else {
+                x.style.display = "none";
+              }
+            }
+        </script>
+    </head>
+    <body>
+        <div><textarea id="code" style="width: 100%;" rows="11">op2=>operation: '\nImproved version of asyncore dispatcher\n'
+op4=>operation: import socket
+op6=>operation: import threading
+op8=>operation: import time
+op10=>operation: import network.asyncore_pollchoose as asyncore
+op12=>operation: import state
+op14=>operation: from threads import BusyError, nonBlocking
+op16=>operation: class ProcessingError(Exception):
+    'General class for protocol parser exception,\n    use as a base for others.'
+    pass
+op18=>operation: class UnknownStateError(ProcessingError):
+    'Parser points to an unknown (unimplemented) state.'
+    pass
+op20=>operation: class AdvancedDispatcher(asyncore.dispatcher):
+    'Improved version of asyncore dispatcher,\n    with buffers and protocol state.'
+    _buf_len = 131072
+
+    def __init__(self, sock=None):
+        if (not hasattr(self, '_map')):
+            asyncore.dispatcher.__init__(self, sock)
+        self.connectedAt = 0
+        self.close_reason = None
+        self.read_buf = bytearray()
+        self.write_buf = bytearray()
+        self.state = 'init'
+        self.lastTx = time.time()
+        self.sentBytes = 0
+        self.receivedBytes = 0
+        self.expectBytes = 0
+        self.readLock = threading.RLock()
+        self.writeLock = threading.RLock()
+        self.processingLock = threading.RLock()
+        self.uploadChunk = self.downloadChunk = 0
+
+    def append_write_buf(self, data):
+        'Append binary data to the end of stream write buffer.'
+        if data:
+            if isinstance(data, list):
+                with self.writeLock:
+                    for chunk in data:
+                        self.write_buf.extend(chunk)
+            else:
+                with self.writeLock:
+                    self.write_buf.extend(data)
+
+    def slice_write_buf(self, length=0):
+        'Cut the beginning of the stream write buffer.'
+        if (length > 0):
+            with self.writeLock:
+                if (length >= len(self.write_buf)):
+                    del self.write_buf[:]
+                else:
+                    del self.write_buf[0:length]
+
+    def slice_read_buf(self, length=0):
+        'Cut the beginning of the stream read buffer.'
+        if (length > 0):
+            with self.readLock:
+                if (length >= len(self.read_buf)):
+                    del self.read_buf[:]
+                else:
+                    del self.read_buf[0:length]
+
+    def process(self):
+        "Process (parse) data that's in the buffer,\n        as long as there is enough data and the connection is open."
+        while (self.connected and (not state.shutdown)):
+            try:
+                with nonBlocking(self.processingLock):
+                    if ((not self.connected) or state.shutdown):
+                        break
+                    if (len(self.read_buf) < self.expectBytes):
+                        return False
+                    try:
+                        cmd = getattr(self, ('state_' + str(self.state)))
+                    except AttributeError:
+                        self.logger.error('Unknown state %s', self.state, exc_info=True)
+                        raise UnknownStateError(self.state)
+                    if (not cmd()):
+                        break
+            except BusyError:
+                return False
+        return False
+
+    def set_state(self, state_str, length=0, expectBytes=0):
+        'Set the next processing state.'
+        self.expectBytes = expectBytes
+        self.slice_read_buf(length)
+        self.state = state_str
+
+    def writable(self):
+        'Is data from the write buffer ready to be sent to the network?'
+        self.uploadChunk = AdvancedDispatcher._buf_len
+        if (asyncore.maxUploadRate > 0):
+            self.uploadChunk = int(asyncore.uploadBucket)
+        self.uploadChunk = min(self.uploadChunk, len(self.write_buf))
+        return (asyncore.dispatcher.writable(self) and (self.connecting or (self.connected and (self.uploadChunk > 0))))
+
+    def readable(self):
+        'Is the read buffer ready to accept data from the network?'
+        self.downloadChunk = AdvancedDispatcher._buf_len
+        if (asyncore.maxDownloadRate > 0):
+            self.downloadChunk = int(asyncore.downloadBucket)
+        try:
+            if ((self.expectBytes > 0) and (not self.fullyEstablished)):
+                self.downloadChunk = min(self.downloadChunk, (self.expectBytes - len(self.read_buf)))
+                if (self.downloadChunk < 0):
+                    self.downloadChunk = 0
+        except AttributeError:
+            pass
+        return (asyncore.dispatcher.readable(self) and (self.connecting or self.accepting or (self.connected and (self.downloadChunk > 0))))
+
+    def handle_read(self):
+        'Append incoming data to the read buffer.'
+        self.lastTx = time.time()
+        newData = self.recv(self.downloadChunk)
+        self.receivedBytes += len(newData)
+        asyncore.update_received(len(newData))
+        with self.readLock:
+            self.read_buf.extend(newData)
+
+    def handle_write(self):
+        'Send outgoing data from write buffer.'
+        self.lastTx = time.time()
+        written = self.send(self.write_buf[0:self.uploadChunk])
+        asyncore.update_sent(written)
+        self.sentBytes += written
+        self.slice_write_buf(written)
+
+    def handle_connect_event(self):
+        'Callback for connection established event.'
+        try:
+            asyncore.dispatcher.handle_connect_event(self)
+        except socket.error as e:
+            if (e.args[0] not in asyncore._DISCONNECTED):
+                raise
+
+    def handle_connect(self):
+        'Method for handling connection established implementations.'
+        self.lastTx = time.time()
+
+    def state_close(self):
+        'Signal to the processing loop to end.'
+        return False
+
+    def handle_close(self):
+        'Callback for connection being closed,\n        but can also be called directly when you want connection to close.'
+        with self.readLock:
+            self.read_buf = bytearray()
+        with self.writeLock:
+            self.write_buf = bytearray()
+        self.set_state('close')
+        self.close()
+
+op2->op4
+op4->op6
+op6->op8
+op8->op10
+op10->op12
+op12->op14
+op14->op16
+op16->op18
+op18->op20
+</textarea></div>
+        <div><button id="run" type="button">Run</button> <button onclick="HelpText()">Format Help</button></div>
+        <div id="HelpTextBlock" style="display:none"><br/>Conditions can also be redirected like cond(yes, bottom) or cond(yes, right)
+... and the other symbols too... like sub1(right)<br/>
+You can also tweak the <b>diagram.drawSVG('diagram', {});</b> script in this file for more changes<br/>
+This is based on <a href="https://github.com/adrai/flowchart.js">flowchart.js on github</a> and <a href="http://flowchart.js.org">http://flowchart.js.org</a> more documentation can be found over there.
+</div><br/><div id="svgbase64"></div>
+        <div id="pngbase64"></div>
+
+        <div id="canvas"></div>
+    </body>
+</html>

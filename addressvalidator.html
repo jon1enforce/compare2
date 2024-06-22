@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <title>addressvalidator.html</title>
+        <style type="text/css">
+          .end-element { fill : #FFCCFF; }
+        </style>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/raphael/2.3.0/raphael.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/flowchart/1.17.1/flowchart.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.1/js/bootstrap.bundle.min.js"></script>
+        <!-- <script src="../release/flowchart.min.js"></script> -->
+        <script>
+
+            window.onload = function () {
+                var btn = document.getElementById("run"),
+                    cd = document.getElementById("code"),
+                    chart;
+                    
+                (btn.onclick = function () {
+                    var code = cd.value;
+
+                    if (chart) {
+                      chart.clean();
+                    }
+
+                    chart = flowchart.parse(code);
+                    chart.drawSVG('canvas', {
+                      'x': 0,
+                      'y': 0,
+                      'line-width': 3,
+                      //'maxWidth': 15,//ensures the flowcharts fits within a certain width
+                      'line-length': 50,
+                      'text-margin': 10,
+                      'font-size': 14,
+                      'font': 'normal',
+                      'font-family': 'Helvetica',
+                      'font-weight': 'normal',
+                      'font-color': 'black',
+                      'line-color': 'black',
+                      'element-color': 'black',
+                      'fill': 'white',
+                      'yes-text': 'yes',
+                      'no-text': 'no',
+                      'arrow-end': 'block',
+                      'scale': 1,
+                      'symbols': {
+                        'start': {
+                          'font-size': 14,
+                          'font-color': 'yellow',
+                          'element-color': 'blue',
+                          'fill': 'green',
+                          'class': 'start-element'
+                        },
+                        'inputoutput': {
+                          'font-color': 'black',
+                          'element-color': 'black',
+                          'fill': 'bisque'
+                        },
+                        'operation': {
+                          'font-color': 'black',
+                          'element-color': 'black',
+                          'fill': 'linen'
+                        },
+                        'subroutine': {
+                          'font-color': 'black',
+                          'element-color': 'blue',
+                          'fill': 'lightgreen'
+                        },
+                        'condition': {
+                          'font-color': 'red',
+                          'element-color': 'black',
+                          'fill': 'yellow'
+                        },
+                        'end':{
+                          'font-size': 20,
+                          'class': 'end-element'
+                        }
+                      },
+                      'flowstate' : {
+                        //'past' : { 'fill' : '#CCCCCC', 'font-size' : 12},
+                        //'current' : {'fill' : 'yellow', 'font-color' : 'red', 'font-weight' : 'bold'},
+                        //'future' : { 'fill' : '#FFFF99'},
+                        'request' : { 'fill' : 'blue'},
+                        'invalid': {'fill' : '#444444'},
+                        'approved' : { 'fill' : '#58C4A3', 'font-size' : 12, 'yes-text' : 'APPROVED', 'no-text' : 'n/a' },
+                        'rejected' : { 'fill' : '#C45879', 'font-size' : 12, 'yes-text' : 'n/a', 'no-text' : 'REJECTED' }
+                      }
+                    });
+                    //create base64 encoding of SVG to generate download link for title(without html or htm).SVG
+                    var currentCanvasDIV = document.getElementById('canvas')
+                    var currentDrawSVG = currentCanvasDIV.innerHTML.replaceAll('ë','e');
+
+                    const OUTsvgBASE64 = btoa(currentDrawSVG)
+                    doctitle = document.title.replace('.html','');
+                    doctitle = doctitle.replace('.htm','');
+
+
+                    var currentCanvasDIV = document.getElementById('canvas')
+                    var currentDrawSVG = currentCanvasDIV.innerHTML.replaceAll('ë','e');
+                    svgSource = currentDrawSVG
+                    svgXML = currentDrawSVG;
+                    // Use SVG Height and Width from the SVG XML to set canvas size
+                    svgXMLsubstringHeight = svgXML.substring(svgXML.indexOf('height='), svgXML.indexOf('version='));
+                    svgXMLsubstringWidth = svgXML.substring(svgXML.indexOf('width='), svgXML.indexOf('xmlns='));
+                    HeightValue = svgXMLsubstringHeight.substring(svgXMLsubstringHeight.indexOf('"')+1,svgXMLsubstringHeight.lastIndexOf('"'));
+                    WidthValue = svgXMLsubstringWidth.substring(svgXMLsubstringWidth.indexOf('"')+1,svgXMLsubstringWidth.lastIndexOf('"'));
+                    HeightValueInt = Math.round(HeightValue)
+                    WidthValueInt = Math.round(WidthValue)
+                    // setup input for base64SvgToBase64Png
+                    let svgSrc = "data:image/svg+xml;base64,"+OUTsvgBASE64;
+                    var pngBase
+                    imageUtil.base64SvgToBase64Png(svgSrc, WidthValueInt, HeightValueInt).then(pngSrc => {
+                    pngBase = pngSrc
+                    // output download link for base64 PNG converted on download from base64
+                    var pngOutHtml = `<a href="${pngBase}" download="${doctitle}.png">PNG - Click here to download current rendered flowchart as ${doctitle}.png</a>`
+                    document.getElementById("pngbase64").innerHTML=pngOutHtml;
+                    });    
+                    // output download link for base64 SVG converted on download from base64
+                    var svgOutHtml = `<a href="data:image/svg+xml;base64,${OUTsvgBASE64}" download=${doctitle}.svg>SVG - Click here to download current rendered flowchart as ${doctitle}.svg</a> `
+                        document.getElementById("svgbase64").innerHTML=svgOutHtml;
+                    })();
+
+                            };
+                 
+
+// derived from https://stackoverflow.com/a/64800570
+// we need to use web browser canvas to generate a image. In this case png
+let imageUtil = {};
+/**
+ * converts a base64 encoded data url SVG image to a PNG image
+ * @param originalBase64 data url of svg image
+ * @param width target width in pixel of PNG image
+ * @param secondTry used internally to prevent endless recursion
+ * @return {Promise<unknown>} resolves to png data url of the image
+ */
+imageUtil.base64SvgToBase64Png = function (originalBase64, width, height, secondTry) {
+    return new Promise(resolve => {
+        let img = document.createElement('img');
+        img.onload = function () {
+            if (!secondTry && (img.naturalWidth === 0 || img.naturalHeight === 0)) {
+                let svgDoc = base64ToSvgDocument(originalBase64);
+                let fixedDoc = fixSvgDocumentFF(svgDoc);
+                return imageUtil.base64SvgToBase64Png(svgDocumentToBase64(fixedDoc), width, height, true).then(result => {
+                    resolve(result);
+                });
+            }
+            //document.body.appendChild(img);
+            let canvas2 = document.createElement("canvas");
+            //document.body.removeChild(img);
+            canvas2.width = width;
+            canvas2.height = height;
+            let ctx = canvas2.getContext("2d");
+            ctx.drawImage(img, 0, 0, canvas2.width, canvas2.height);
+            try {
+                let data = canvas2.toDataURL('image/png');
+                resolve(data);
+            } catch (e) {
+                resolve(null);
+            }
+        };
+        img.src = originalBase64;
+    });
+}
+
+//needed because Firefox doesn't correctly handle SVG with size = 0, see https://bugzilla.mozilla.org/show_bug.cgi?id=700533
+function fixSvgDocumentFF(svgDocument) {
+    try {
+        let widthInt = parseInt(svgDocument.documentElement.width.baseVal.value) || 500;
+        let heightInt = parseInt(svgDocument.documentElement.height.baseVal.value) || 500;
+        svgDocument.documentElement.width.baseVal.newValueSpecifiedUnits(SVGLength.SVG_LENGTHTYPE_PX, widthInt);
+        svgDocument.documentElement.height.baseVal.newValueSpecifiedUnits(SVGLength.SVG_LENGTHTYPE_PX, heightInt);
+        return svgDocument;
+    } catch (e) {
+        return svgDocument;
+    }
+}
+
+function svgDocumentToBase64(svgDocument) {
+    try {
+        let base64EncodedSVG = btoa(new XMLSerializer().serializeToString(svgDocument));
+        return 'data:image/svg+xml;base64,' + base64EncodedSVG;
+    } catch (e) {
+        return null;
+    }
+}
+
+function base64ToSvgDocument(base64) {
+    let svg = atob(base64.substring(base64.indexOf('base64,') + 7));
+    svg = svg.substring(svg.indexOf('<svg'));
+    let parser = new DOMParser();
+    return parser.parseFromString(svg, "image/svg+xml");
+} 
+        </script>
+
+        <script>
+            function HelpText() {
+              var x = document.getElementById("HelpTextBlock");
+              if (x.style.display === "none") {
+                x.style.display = "block";
+              } else {
+                x.style.display = "none";
+              }
+            }
+        </script>
+    </head>
+    <body>
+        <div><textarea id="code" style="width: 100%;" rows="11">op2=>operation: '\nAddress validator module.\n'
+op4=>operation: from Queue import Empty
+op6=>operation: from PyQt4 import QtGui
+op8=>operation: from addresses import decodeAddress, addBMIfNotPresent
+op10=>operation: from bmconfigparser import config
+op12=>operation: from queues import apiAddressGeneratorReturnQueue, addressGeneratorQueue
+op14=>operation: from tr import _translate
+op16=>operation: from utils import str_chan
+op18=>operation: class AddressPassPhraseValidatorMixin(object):
+    'Bitmessage address or passphrase validator class for Qt UI'
+
+    def setParams(self, passPhraseObject=None, addressObject=None, feedBackObject=None, buttonBox=None, addressMandatory=True):
+        'Initialisation'
+        self.addressObject = addressObject
+        self.passPhraseObject = passPhraseObject
+        self.feedBackObject = feedBackObject
+        self.buttonBox = buttonBox
+        self.addressMandatory = addressMandatory
+        self.isValid = False
+        self.okButtonLabel = self.buttonBox.button(QtGui.QDialogButtonBox.Ok).text()
+
+    def setError(self, string):
+        'Indicate that the validation is pending or failed'
+        if ((string is not None) and (self.feedBackObject is not None)):
+            font = QtGui.QFont()
+            font.setBold(True)
+            self.feedBackObject.setFont(font)
+            self.feedBackObject.setStyleSheet('QLabel { color : red; }')
+            self.feedBackObject.setText(string)
+        self.isValid = False
+        if self.buttonBox:
+            self.buttonBox.button(QtGui.QDialogButtonBox.Ok).setEnabled(False)
+            if ((string is not None) and (self.feedBackObject is not None)):
+                self.buttonBox.button(QtGui.QDialogButtonBox.Ok).setText(_translate('AddressValidator', 'Invalid'))
+            else:
+                self.buttonBox.button(QtGui.QDialogButtonBox.Ok).setText(_translate('AddressValidator', 'Validating...'))
+
+    def setOK(self, string):
+        'Indicate that the validation succeeded'
+        if ((string is not None) and (self.feedBackObject is not None)):
+            font = QtGui.QFont()
+            font.setBold(False)
+            self.feedBackObject.setFont(font)
+            self.feedBackObject.setStyleSheet('QLabel { }')
+            self.feedBackObject.setText(string)
+        self.isValid = True
+        if self.buttonBox:
+            self.buttonBox.button(QtGui.QDialogButtonBox.Ok).setEnabled(True)
+            self.buttonBox.button(QtGui.QDialogButtonBox.Ok).setText(self.okButtonLabel)
+
+    def checkQueue(self):
+        'Validator queue loop'
+        gotOne = False
+        if (not addressGeneratorQueue.empty()):
+            self.setError(None)
+            return None
+        while True:
+            try:
+                addressGeneratorReturnValue = apiAddressGeneratorReturnQueue.get(False)
+            except Empty:
+                if gotOne:
+                    break
+                else:
+                    return None
+            else:
+                gotOne = True
+        if (not addressGeneratorReturnValue):
+            self.setError(_translate('AddressValidator', 'Address already present as one of your identities.'))
+            return (QtGui.QValidator.Intermediate, 0)
+        if (addressGeneratorReturnValue[0] == 'chan name does not match address'):
+            self.setError(_translate('AddressValidator', "Although the Bitmessage address you entered was valid, it doesn't match the chan name."))
+            return (QtGui.QValidator.Intermediate, 0)
+        self.setOK(_translate('MainWindow', 'Passphrase and address appear to be valid.'))
+
+    def returnValid(self):
+        'Return the value of whether the validation was successful'
+        if self.isValid:
+            return QtGui.QValidator.Acceptable
+        return QtGui.QValidator.Intermediate
+
+    def validate(self, s, pos):
+        'Top level validator method'
+        if (self.addressObject is None):
+            address = None
+        else:
+            address = str(self.addressObject.text().toUtf8())
+            if (address == ''):
+                address = None
+        if (self.passPhraseObject is None):
+            passPhrase = ''
+        else:
+            passPhrase = str(self.passPhraseObject.text().toUtf8())
+            if (passPhrase == ''):
+                passPhrase = None
+        if (passPhrase is None):
+            self.setError(_translate('AddressValidator', "Chan name/passphrase needed. You didn't enter a chan name."))
+            return (QtGui.QValidator.Intermediate, pos)
+        if (self.addressMandatory or (address is not None)):
+            if (address in config.addresses()):
+                self.setError(_translate('AddressValidator', 'Address already present as one of your identities.'))
+                return (QtGui.QValidator.Intermediate, pos)
+            if (decodeAddress(address)[0] == 'versiontoohigh'):
+                self.setError(_translate('AddressValidator', 'Address too new. Although that Bitmessage address might be valid, its version number is too new for us to handle. Perhaps you need to upgrade Bitmessage.'))
+                return (QtGui.QValidator.Intermediate, pos)
+            if (decodeAddress(address)[0] != 'success'):
+                self.setError(_translate('AddressValidator', 'The Bitmessage address is not valid.'))
+                return (QtGui.QValidator.Intermediate, pos)
+        if (not self.buttonBox.button(QtGui.QDialogButtonBox.Ok).hasFocus()):
+            self.setError(None)
+        if (address is None):
+            addressGeneratorQueue.put(('createChan', 4, 1, ((str_chan + ' ') + str(passPhrase)), passPhrase, False))
+        else:
+            addressGeneratorQueue.put(('joinChan', addBMIfNotPresent(address), '{} {}'.format(str_chan, passPhrase), passPhrase, False))
+        if self.buttonBox.button(QtGui.QDialogButtonBox.Ok).hasFocus():
+            return (self.returnValid(), pos)
+        return (QtGui.QValidator.Intermediate, pos)
+
+    def checkData(self):
+        'Validator Qt signal interface'
+        return self.validate('', 0)
+op20=>operation: class AddressValidator(QtGui.QValidator, AddressPassPhraseValidatorMixin):
+    'AddressValidator class for Qt UI'
+
+    def __init__(self, parent=None, passPhraseObject=None, feedBackObject=None, buttonBox=None, addressMandatory=True):
+        super(AddressValidator, self).__init__(parent)
+        self.setParams(passPhraseObject, parent, feedBackObject, buttonBox, addressMandatory)
+op22=>operation: class PassPhraseValidator(QtGui.QValidator, AddressPassPhraseValidatorMixin):
+    'PassPhraseValidator class for Qt UI'
+
+    def __init__(self, parent=None, addressObject=None, feedBackObject=None, buttonBox=None, addressMandatory=False):
+        super(PassPhraseValidator, self).__init__(parent)
+        self.setParams(parent, addressObject, feedBackObject, buttonBox, addressMandatory)
+
+op2->op4
+op4->op6
+op6->op8
+op8->op10
+op10->op12
+op12->op14
+op14->op16
+op16->op18
+op18->op20
+op20->op22
+</textarea></div>
+        <div><button id="run" type="button">Run</button> <button onclick="HelpText()">Format Help</button></div>
+        <div id="HelpTextBlock" style="display:none"><br/>Conditions can also be redirected like cond(yes, bottom) or cond(yes, right)
+... and the other symbols too... like sub1(right)<br/>
+You can also tweak the <b>diagram.drawSVG('diagram', {});</b> script in this file for more changes<br/>
+This is based on <a href="https://github.com/adrai/flowchart.js">flowchart.js on github</a> and <a href="http://flowchart.js.org">http://flowchart.js.org</a> more documentation can be found over there.
+</div><br/><div id="svgbase64"></div>
+        <div id="pngbase64"></div>
+
+        <div id="canvas"></div>
+    </body>
+</html>

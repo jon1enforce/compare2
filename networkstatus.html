@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <title>networkstatus.html</title>
+        <style type="text/css">
+          .end-element { fill : #FFCCFF; }
+        </style>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/raphael/2.3.0/raphael.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/flowchart/1.17.1/flowchart.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.1/js/bootstrap.bundle.min.js"></script>
+        <!-- <script src="../release/flowchart.min.js"></script> -->
+        <script>
+
+            window.onload = function () {
+                var btn = document.getElementById("run"),
+                    cd = document.getElementById("code"),
+                    chart;
+                    
+                (btn.onclick = function () {
+                    var code = cd.value;
+
+                    if (chart) {
+                      chart.clean();
+                    }
+
+                    chart = flowchart.parse(code);
+                    chart.drawSVG('canvas', {
+                      'x': 0,
+                      'y': 0,
+                      'line-width': 3,
+                      //'maxWidth': 15,//ensures the flowcharts fits within a certain width
+                      'line-length': 50,
+                      'text-margin': 10,
+                      'font-size': 14,
+                      'font': 'normal',
+                      'font-family': 'Helvetica',
+                      'font-weight': 'normal',
+                      'font-color': 'black',
+                      'line-color': 'black',
+                      'element-color': 'black',
+                      'fill': 'white',
+                      'yes-text': 'yes',
+                      'no-text': 'no',
+                      'arrow-end': 'block',
+                      'scale': 1,
+                      'symbols': {
+                        'start': {
+                          'font-size': 14,
+                          'font-color': 'yellow',
+                          'element-color': 'blue',
+                          'fill': 'green',
+                          'class': 'start-element'
+                        },
+                        'inputoutput': {
+                          'font-color': 'black',
+                          'element-color': 'black',
+                          'fill': 'bisque'
+                        },
+                        'operation': {
+                          'font-color': 'black',
+                          'element-color': 'black',
+                          'fill': 'linen'
+                        },
+                        'subroutine': {
+                          'font-color': 'black',
+                          'element-color': 'blue',
+                          'fill': 'lightgreen'
+                        },
+                        'condition': {
+                          'font-color': 'red',
+                          'element-color': 'black',
+                          'fill': 'yellow'
+                        },
+                        'end':{
+                          'font-size': 20,
+                          'class': 'end-element'
+                        }
+                      },
+                      'flowstate' : {
+                        //'past' : { 'fill' : '#CCCCCC', 'font-size' : 12},
+                        //'current' : {'fill' : 'yellow', 'font-color' : 'red', 'font-weight' : 'bold'},
+                        //'future' : { 'fill' : '#FFFF99'},
+                        'request' : { 'fill' : 'blue'},
+                        'invalid': {'fill' : '#444444'},
+                        'approved' : { 'fill' : '#58C4A3', 'font-size' : 12, 'yes-text' : 'APPROVED', 'no-text' : 'n/a' },
+                        'rejected' : { 'fill' : '#C45879', 'font-size' : 12, 'yes-text' : 'n/a', 'no-text' : 'REJECTED' }
+                      }
+                    });
+                    //create base64 encoding of SVG to generate download link for title(without html or htm).SVG
+                    var currentCanvasDIV = document.getElementById('canvas')
+                    var currentDrawSVG = currentCanvasDIV.innerHTML.replaceAll('ë','e');
+
+                    const OUTsvgBASE64 = btoa(currentDrawSVG)
+                    doctitle = document.title.replace('.html','');
+                    doctitle = doctitle.replace('.htm','');
+
+
+                    var currentCanvasDIV = document.getElementById('canvas')
+                    var currentDrawSVG = currentCanvasDIV.innerHTML.replaceAll('ë','e');
+                    svgSource = currentDrawSVG
+                    svgXML = currentDrawSVG;
+                    // Use SVG Height and Width from the SVG XML to set canvas size
+                    svgXMLsubstringHeight = svgXML.substring(svgXML.indexOf('height='), svgXML.indexOf('version='));
+                    svgXMLsubstringWidth = svgXML.substring(svgXML.indexOf('width='), svgXML.indexOf('xmlns='));
+                    HeightValue = svgXMLsubstringHeight.substring(svgXMLsubstringHeight.indexOf('"')+1,svgXMLsubstringHeight.lastIndexOf('"'));
+                    WidthValue = svgXMLsubstringWidth.substring(svgXMLsubstringWidth.indexOf('"')+1,svgXMLsubstringWidth.lastIndexOf('"'));
+                    HeightValueInt = Math.round(HeightValue)
+                    WidthValueInt = Math.round(WidthValue)
+                    // setup input for base64SvgToBase64Png
+                    let svgSrc = "data:image/svg+xml;base64,"+OUTsvgBASE64;
+                    var pngBase
+                    imageUtil.base64SvgToBase64Png(svgSrc, WidthValueInt, HeightValueInt).then(pngSrc => {
+                    pngBase = pngSrc
+                    // output download link for base64 PNG converted on download from base64
+                    var pngOutHtml = `<a href="${pngBase}" download="${doctitle}.png">PNG - Click here to download current rendered flowchart as ${doctitle}.png</a>`
+                    document.getElementById("pngbase64").innerHTML=pngOutHtml;
+                    });    
+                    // output download link for base64 SVG converted on download from base64
+                    var svgOutHtml = `<a href="data:image/svg+xml;base64,${OUTsvgBASE64}" download=${doctitle}.svg>SVG - Click here to download current rendered flowchart as ${doctitle}.svg</a> `
+                        document.getElementById("svgbase64").innerHTML=svgOutHtml;
+                    })();
+
+                            };
+                 
+
+// derived from https://stackoverflow.com/a/64800570
+// we need to use web browser canvas to generate a image. In this case png
+let imageUtil = {};
+/**
+ * converts a base64 encoded data url SVG image to a PNG image
+ * @param originalBase64 data url of svg image
+ * @param width target width in pixel of PNG image
+ * @param secondTry used internally to prevent endless recursion
+ * @return {Promise<unknown>} resolves to png data url of the image
+ */
+imageUtil.base64SvgToBase64Png = function (originalBase64, width, height, secondTry) {
+    return new Promise(resolve => {
+        let img = document.createElement('img');
+        img.onload = function () {
+            if (!secondTry && (img.naturalWidth === 0 || img.naturalHeight === 0)) {
+                let svgDoc = base64ToSvgDocument(originalBase64);
+                let fixedDoc = fixSvgDocumentFF(svgDoc);
+                return imageUtil.base64SvgToBase64Png(svgDocumentToBase64(fixedDoc), width, height, true).then(result => {
+                    resolve(result);
+                });
+            }
+            //document.body.appendChild(img);
+            let canvas2 = document.createElement("canvas");
+            //document.body.removeChild(img);
+            canvas2.width = width;
+            canvas2.height = height;
+            let ctx = canvas2.getContext("2d");
+            ctx.drawImage(img, 0, 0, canvas2.width, canvas2.height);
+            try {
+                let data = canvas2.toDataURL('image/png');
+                resolve(data);
+            } catch (e) {
+                resolve(null);
+            }
+        };
+        img.src = originalBase64;
+    });
+}
+
+//needed because Firefox doesn't correctly handle SVG with size = 0, see https://bugzilla.mozilla.org/show_bug.cgi?id=700533
+function fixSvgDocumentFF(svgDocument) {
+    try {
+        let widthInt = parseInt(svgDocument.documentElement.width.baseVal.value) || 500;
+        let heightInt = parseInt(svgDocument.documentElement.height.baseVal.value) || 500;
+        svgDocument.documentElement.width.baseVal.newValueSpecifiedUnits(SVGLength.SVG_LENGTHTYPE_PX, widthInt);
+        svgDocument.documentElement.height.baseVal.newValueSpecifiedUnits(SVGLength.SVG_LENGTHTYPE_PX, heightInt);
+        return svgDocument;
+    } catch (e) {
+        return svgDocument;
+    }
+}
+
+function svgDocumentToBase64(svgDocument) {
+    try {
+        let base64EncodedSVG = btoa(new XMLSerializer().serializeToString(svgDocument));
+        return 'data:image/svg+xml;base64,' + base64EncodedSVG;
+    } catch (e) {
+        return null;
+    }
+}
+
+function base64ToSvgDocument(base64) {
+    let svg = atob(base64.substring(base64.indexOf('base64,') + 7));
+    svg = svg.substring(svg.indexOf('<svg'));
+    let parser = new DOMParser();
+    return parser.parseFromString(svg, "image/svg+xml");
+} 
+        </script>
+
+        <script>
+            function HelpText() {
+              var x = document.getElementById("HelpTextBlock");
+              if (x.style.display === "none") {
+                x.style.display = "block";
+              } else {
+                x.style.display = "none";
+              }
+            }
+        </script>
+    </head>
+    <body>
+        <div><textarea id="code" style="width: 100%;" rows="11">op2=>operation: '\nNetwork status tab widget definition.\n'
+op4=>operation: import time
+op6=>operation: from PyQt4 import QtCore, QtGui
+op8=>operation: import l10n
+op10=>operation: import network.stats
+op12=>operation: import state
+op14=>operation: import widgets
+op16=>operation: from network import connectionpool, knownnodes
+op18=>operation: from retranslateui import RetranslateMixin
+op20=>operation: from tr import _translate
+op22=>operation: from uisignaler import UISignaler
+op24=>operation: class NetworkStatus(QtGui.QWidget, RetranslateMixin):
+    'Network status tab'
+
+    def __init__(self, parent=None):
+        super(NetworkStatus, self).__init__(parent)
+        widgets.load('networkstatus.ui', self)
+        header = self.tableWidgetConnectionCount.horizontalHeader()
+        header.setResizeMode(QtGui.QHeaderView.ResizeToContents)
+        if (header.sortIndicatorSection() > 4):
+            header.setSortIndicator(0, QtCore.Qt.AscendingOrder)
+        self.startup = time.localtime()
+        self.UISignalThread = UISignaler.get()
+        QtCore.QObject.connect(self.UISignalThread, QtCore.SIGNAL('updateNumberOfMessagesProcessed()'), self.updateNumberOfMessagesProcessed)
+        QtCore.QObject.connect(self.UISignalThread, QtCore.SIGNAL('updateNumberOfPubkeysProcessed()'), self.updateNumberOfPubkeysProcessed)
+        QtCore.QObject.connect(self.UISignalThread, QtCore.SIGNAL('updateNumberOfBroadcastsProcessed()'), self.updateNumberOfBroadcastsProcessed)
+        QtCore.QObject.connect(self.UISignalThread, QtCore.SIGNAL('updateNetworkStatusTab(PyQt_PyObject,PyQt_PyObject,PyQt_PyObject)'), self.updateNetworkStatusTab)
+        self.timer = QtCore.QTimer()
+        QtCore.QObject.connect(self.timer, QtCore.SIGNAL('timeout()'), self.runEveryTwoSeconds)
+
+    def startUpdate(self):
+        'Start a timer to update counters every 2 seconds'
+        state.Inventory.numberOfInventoryLookupsPerformed = 0
+        self.runEveryTwoSeconds()
+        self.timer.start(2000)
+
+    def stopUpdate(self):
+        'Stop counter update timer'
+        self.timer.stop()
+
+    def formatBytes(self, num):
+        'Format bytes nicely (SI prefixes)'
+        for x in [_translate('networkstatus', 'byte(s)', None, QtCore.QCoreApplication.CodecForTr, num), 'kB', 'MB', 'GB']:
+            if (num < 1000.0):
+                return ('%3.0f %s' % (num, x))
+            num /= 1000.0
+        return ('%3.0f %s' % (num, 'TB'))
+
+    def formatByteRate(self, num):
+        'Format transfer speed in kB/s'
+        num /= 1000
+        return ('%4.0f kB' % num)
+
+    def updateNumberOfObjectsToBeSynced(self):
+        'Update the counter for number of objects to be synced'
+        self.labelSyncStatus.setText(_translate('networkstatus', 'Object(s) to be synced: %n', None, QtCore.QCoreApplication.CodecForTr, (network.stats.pendingDownload() + network.stats.pendingUpload())))
+
+    def updateNumberOfMessagesProcessed(self):
+        'Update the counter for number of processed messages'
+        self.updateNumberOfObjectsToBeSynced()
+        self.labelMessageCount.setText(_translate('networkstatus', 'Processed %n person-to-person message(s).', None, QtCore.QCoreApplication.CodecForTr, state.numberOfMessagesProcessed))
+
+    def updateNumberOfBroadcastsProcessed(self):
+        'Update the counter for the number of processed broadcasts'
+        self.updateNumberOfObjectsToBeSynced()
+        self.labelBroadcastCount.setText(_translate('networkstatus', 'Processed %n broadcast message(s).', None, QtCore.QCoreApplication.CodecForTr, state.numberOfBroadcastsProcessed))
+
+    def updateNumberOfPubkeysProcessed(self):
+        'Update the counter for the number of processed pubkeys'
+        self.updateNumberOfObjectsToBeSynced()
+        self.labelPubkeyCount.setText(_translate('networkstatus', 'Processed %n public key(s).', None, QtCore.QCoreApplication.CodecForTr, state.numberOfPubkeysProcessed))
+
+    def updateNumberOfBytes(self):
+        '\n        This function is run every two seconds, so we divide the rate of bytes\n        sent and received by 2.\n        '
+        self.labelBytesRecvCount.setText(_translate('networkstatus', 'Down: %1/s  Total: %2').arg(self.formatByteRate(network.stats.downloadSpeed()), self.formatBytes(network.stats.receivedBytes())))
+        self.labelBytesSentCount.setText(_translate('networkstatus', 'Up: %1/s  Total: %2').arg(self.formatByteRate(network.stats.uploadSpeed()), self.formatBytes(network.stats.sentBytes())))
+
+    def updateNetworkStatusTab(self, outbound, add, destination):
+        'Add or remove an entry to the list of connected peers'
+        if outbound:
+            try:
+                c = connectionpool.pool.outboundConnections[destination]
+            except KeyError:
+                if add:
+                    return
+        else:
+            try:
+                c = connectionpool.pool.inboundConnections[destination]
+            except KeyError:
+                try:
+                    c = connectionpool.pool.inboundConnections[destination.host]
+                except KeyError:
+                    if add:
+                        return
+        self.tableWidgetConnectionCount.setUpdatesEnabled(False)
+        self.tableWidgetConnectionCount.setSortingEnabled(False)
+        if add:
+            self.tableWidgetConnectionCount.insertRow(0)
+            self.tableWidgetConnectionCount.setItem(0, 0, QtGui.QTableWidgetItem(('%s:%i' % (destination.host, destination.port))))
+            self.tableWidgetConnectionCount.setItem(0, 2, QtGui.QTableWidgetItem(('%s' % c.userAgent)))
+            self.tableWidgetConnectionCount.setItem(0, 3, QtGui.QTableWidgetItem(('%s' % c.tlsVersion)))
+            self.tableWidgetConnectionCount.setItem(0, 4, QtGui.QTableWidgetItem(('%s' % ','.join(map(str, c.streams)))))
+            try:
+                rating = ('%.1f' % knownnodes.knownNodes[1][destination]['rating'])
+            except KeyError:
+                rating = '-'
+            self.tableWidgetConnectionCount.setItem(0, 1, QtGui.QTableWidgetItem(('%s' % rating)))
+            if outbound:
+                brush = QtGui.QBrush(QtGui.QColor('yellow'), QtCore.Qt.SolidPattern)
+            else:
+                brush = QtGui.QBrush(QtGui.QColor('green'), QtCore.Qt.SolidPattern)
+            for j in range(1):
+                self.tableWidgetConnectionCount.item(0, j).setBackground(brush)
+            self.tableWidgetConnectionCount.item(0, 0).setData(QtCore.Qt.UserRole, destination)
+            self.tableWidgetConnectionCount.item(0, 1).setData(QtCore.Qt.UserRole, outbound)
+        else:
+            if (not connectionpool.pool.inboundConnections):
+                self.window().setStatusIcon('yellow')
+            for i in range(self.tableWidgetConnectionCount.rowCount()):
+                if (self.tableWidgetConnectionCount.item(i, 0).data(QtCore.Qt.UserRole).toPyObject() != destination):
+                    continue
+                if (self.tableWidgetConnectionCount.item(i, 1).data(QtCore.Qt.UserRole).toPyObject() == outbound):
+                    self.tableWidgetConnectionCount.removeRow(i)
+                    break
+        self.tableWidgetConnectionCount.setUpdatesEnabled(True)
+        self.tableWidgetConnectionCount.setSortingEnabled(True)
+        self.labelTotalConnections.setText(_translate('networkstatus', 'Total Connections: %1').arg(str(self.tableWidgetConnectionCount.rowCount())))
+        if (self.tableWidgetConnectionCount.rowCount() and (state.statusIconColor == 'red')):
+            self.window().setStatusIcon('yellow')
+        elif ((self.tableWidgetConnectionCount.rowCount() == 0) and (state.statusIconColor != 'red')):
+            self.window().setStatusIcon('red')
+
+    def runEveryTwoSeconds(self):
+        'Updates counters, runs every 2 seconds if the timer is running'
+        self.labelLookupsPerSecond.setText(_translate('networkstatus', 'Inventory lookups per second: %1').arg(str((state.Inventory.numberOfInventoryLookupsPerformed / 2))))
+        state.Inventory.numberOfInventoryLookupsPerformed = 0
+        self.updateNumberOfBytes()
+        self.updateNumberOfObjectsToBeSynced()
+
+    def retranslateUi(self):
+        'Conventional Qt Designer method for dynamic l10n'
+        super(NetworkStatus, self).retranslateUi()
+        self.labelTotalConnections.setText(_translate('networkstatus', 'Total Connections: %1').arg(str(self.tableWidgetConnectionCount.rowCount())))
+        self.labelStartupTime.setText(_translate('networkstatus', 'Since startup on %1').arg(l10n.formatTimestamp(self.startup)))
+        self.updateNumberOfMessagesProcessed()
+        self.updateNumberOfBroadcastsProcessed()
+        self.updateNumberOfPubkeysProcessed()
+
+op2->op4
+op4->op6
+op6->op8
+op8->op10
+op10->op12
+op12->op14
+op14->op16
+op16->op18
+op18->op20
+op20->op22
+op22->op24
+</textarea></div>
+        <div><button id="run" type="button">Run</button> <button onclick="HelpText()">Format Help</button></div>
+        <div id="HelpTextBlock" style="display:none"><br/>Conditions can also be redirected like cond(yes, bottom) or cond(yes, right)
+... and the other symbols too... like sub1(right)<br/>
+You can also tweak the <b>diagram.drawSVG('diagram', {});</b> script in this file for more changes<br/>
+This is based on <a href="https://github.com/adrai/flowchart.js">flowchart.js on github</a> and <a href="http://flowchart.js.org">http://flowchart.js.org</a> more documentation can be found over there.
+</div><br/><div id="svgbase64"></div>
+        <div id="pngbase64"></div>
+
+        <div id="canvas"></div>
+    </body>
+</html>

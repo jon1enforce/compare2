@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <title>class_singleCleaner.html</title>
+        <style type="text/css">
+          .end-element { fill : #FFCCFF; }
+        </style>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/raphael/2.3.0/raphael.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/flowchart/1.17.1/flowchart.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.1/js/bootstrap.bundle.min.js"></script>
+        <!-- <script src="../release/flowchart.min.js"></script> -->
+        <script>
+
+            window.onload = function () {
+                var btn = document.getElementById("run"),
+                    cd = document.getElementById("code"),
+                    chart;
+                    
+                (btn.onclick = function () {
+                    var code = cd.value;
+
+                    if (chart) {
+                      chart.clean();
+                    }
+
+                    chart = flowchart.parse(code);
+                    chart.drawSVG('canvas', {
+                      'x': 0,
+                      'y': 0,
+                      'line-width': 3,
+                      //'maxWidth': 15,//ensures the flowcharts fits within a certain width
+                      'line-length': 50,
+                      'text-margin': 10,
+                      'font-size': 14,
+                      'font': 'normal',
+                      'font-family': 'Helvetica',
+                      'font-weight': 'normal',
+                      'font-color': 'black',
+                      'line-color': 'black',
+                      'element-color': 'black',
+                      'fill': 'white',
+                      'yes-text': 'yes',
+                      'no-text': 'no',
+                      'arrow-end': 'block',
+                      'scale': 1,
+                      'symbols': {
+                        'start': {
+                          'font-size': 14,
+                          'font-color': 'yellow',
+                          'element-color': 'blue',
+                          'fill': 'green',
+                          'class': 'start-element'
+                        },
+                        'inputoutput': {
+                          'font-color': 'black',
+                          'element-color': 'black',
+                          'fill': 'bisque'
+                        },
+                        'operation': {
+                          'font-color': 'black',
+                          'element-color': 'black',
+                          'fill': 'linen'
+                        },
+                        'subroutine': {
+                          'font-color': 'black',
+                          'element-color': 'blue',
+                          'fill': 'lightgreen'
+                        },
+                        'condition': {
+                          'font-color': 'red',
+                          'element-color': 'black',
+                          'fill': 'yellow'
+                        },
+                        'end':{
+                          'font-size': 20,
+                          'class': 'end-element'
+                        }
+                      },
+                      'flowstate' : {
+                        //'past' : { 'fill' : '#CCCCCC', 'font-size' : 12},
+                        //'current' : {'fill' : 'yellow', 'font-color' : 'red', 'font-weight' : 'bold'},
+                        //'future' : { 'fill' : '#FFFF99'},
+                        'request' : { 'fill' : 'blue'},
+                        'invalid': {'fill' : '#444444'},
+                        'approved' : { 'fill' : '#58C4A3', 'font-size' : 12, 'yes-text' : 'APPROVED', 'no-text' : 'n/a' },
+                        'rejected' : { 'fill' : '#C45879', 'font-size' : 12, 'yes-text' : 'n/a', 'no-text' : 'REJECTED' }
+                      }
+                    });
+                    //create base64 encoding of SVG to generate download link for title(without html or htm).SVG
+                    var currentCanvasDIV = document.getElementById('canvas')
+                    var currentDrawSVG = currentCanvasDIV.innerHTML.replaceAll('ë','e');
+
+                    const OUTsvgBASE64 = btoa(currentDrawSVG)
+                    doctitle = document.title.replace('.html','');
+                    doctitle = doctitle.replace('.htm','');
+
+
+                    var currentCanvasDIV = document.getElementById('canvas')
+                    var currentDrawSVG = currentCanvasDIV.innerHTML.replaceAll('ë','e');
+                    svgSource = currentDrawSVG
+                    svgXML = currentDrawSVG;
+                    // Use SVG Height and Width from the SVG XML to set canvas size
+                    svgXMLsubstringHeight = svgXML.substring(svgXML.indexOf('height='), svgXML.indexOf('version='));
+                    svgXMLsubstringWidth = svgXML.substring(svgXML.indexOf('width='), svgXML.indexOf('xmlns='));
+                    HeightValue = svgXMLsubstringHeight.substring(svgXMLsubstringHeight.indexOf('"')+1,svgXMLsubstringHeight.lastIndexOf('"'));
+                    WidthValue = svgXMLsubstringWidth.substring(svgXMLsubstringWidth.indexOf('"')+1,svgXMLsubstringWidth.lastIndexOf('"'));
+                    HeightValueInt = Math.round(HeightValue)
+                    WidthValueInt = Math.round(WidthValue)
+                    // setup input for base64SvgToBase64Png
+                    let svgSrc = "data:image/svg+xml;base64,"+OUTsvgBASE64;
+                    var pngBase
+                    imageUtil.base64SvgToBase64Png(svgSrc, WidthValueInt, HeightValueInt).then(pngSrc => {
+                    pngBase = pngSrc
+                    // output download link for base64 PNG converted on download from base64
+                    var pngOutHtml = `<a href="${pngBase}" download="${doctitle}.png">PNG - Click here to download current rendered flowchart as ${doctitle}.png</a>`
+                    document.getElementById("pngbase64").innerHTML=pngOutHtml;
+                    });    
+                    // output download link for base64 SVG converted on download from base64
+                    var svgOutHtml = `<a href="data:image/svg+xml;base64,${OUTsvgBASE64}" download=${doctitle}.svg>SVG - Click here to download current rendered flowchart as ${doctitle}.svg</a> `
+                        document.getElementById("svgbase64").innerHTML=svgOutHtml;
+                    })();
+
+                            };
+                 
+
+// derived from https://stackoverflow.com/a/64800570
+// we need to use web browser canvas to generate a image. In this case png
+let imageUtil = {};
+/**
+ * converts a base64 encoded data url SVG image to a PNG image
+ * @param originalBase64 data url of svg image
+ * @param width target width in pixel of PNG image
+ * @param secondTry used internally to prevent endless recursion
+ * @return {Promise<unknown>} resolves to png data url of the image
+ */
+imageUtil.base64SvgToBase64Png = function (originalBase64, width, height, secondTry) {
+    return new Promise(resolve => {
+        let img = document.createElement('img');
+        img.onload = function () {
+            if (!secondTry && (img.naturalWidth === 0 || img.naturalHeight === 0)) {
+                let svgDoc = base64ToSvgDocument(originalBase64);
+                let fixedDoc = fixSvgDocumentFF(svgDoc);
+                return imageUtil.base64SvgToBase64Png(svgDocumentToBase64(fixedDoc), width, height, true).then(result => {
+                    resolve(result);
+                });
+            }
+            //document.body.appendChild(img);
+            let canvas2 = document.createElement("canvas");
+            //document.body.removeChild(img);
+            canvas2.width = width;
+            canvas2.height = height;
+            let ctx = canvas2.getContext("2d");
+            ctx.drawImage(img, 0, 0, canvas2.width, canvas2.height);
+            try {
+                let data = canvas2.toDataURL('image/png');
+                resolve(data);
+            } catch (e) {
+                resolve(null);
+            }
+        };
+        img.src = originalBase64;
+    });
+}
+
+//needed because Firefox doesn't correctly handle SVG with size = 0, see https://bugzilla.mozilla.org/show_bug.cgi?id=700533
+function fixSvgDocumentFF(svgDocument) {
+    try {
+        let widthInt = parseInt(svgDocument.documentElement.width.baseVal.value) || 500;
+        let heightInt = parseInt(svgDocument.documentElement.height.baseVal.value) || 500;
+        svgDocument.documentElement.width.baseVal.newValueSpecifiedUnits(SVGLength.SVG_LENGTHTYPE_PX, widthInt);
+        svgDocument.documentElement.height.baseVal.newValueSpecifiedUnits(SVGLength.SVG_LENGTHTYPE_PX, heightInt);
+        return svgDocument;
+    } catch (e) {
+        return svgDocument;
+    }
+}
+
+function svgDocumentToBase64(svgDocument) {
+    try {
+        let base64EncodedSVG = btoa(new XMLSerializer().serializeToString(svgDocument));
+        return 'data:image/svg+xml;base64,' + base64EncodedSVG;
+    } catch (e) {
+        return null;
+    }
+}
+
+function base64ToSvgDocument(base64) {
+    let svg = atob(base64.substring(base64.indexOf('base64,') + 7));
+    svg = svg.substring(svg.indexOf('<svg'));
+    let parser = new DOMParser();
+    return parser.parseFromString(svg, "image/svg+xml");
+} 
+        </script>
+
+        <script>
+            function HelpText() {
+              var x = document.getElementById("HelpTextBlock");
+              if (x.style.display === "none") {
+                x.style.display = "block";
+              } else {
+                x.style.display = "none";
+              }
+            }
+        </script>
+    </head>
+    <body>
+        <div><textarea id="code" style="width: 100%;" rows="11">op2=>operation: "\nThe `singleCleaner` class is a timer-driven thread that cleans data structures\nto free memory, resends messages when a remote node doesn't respond, and\nsends pong messages to keep connections alive if the network isn't busy.\n\nIt cleans these data structures in memory:\n  - inventory (moves data to the on-disk sql database)\n  - inventorySets (clears then reloads data out of sql database)\n\nIt cleans these tables on the disk:\n  - inventory (clears expired objects)\n  - pubkeys (clears pubkeys older than 4 weeks old which we have not used\n    personally)\n  - knownNodes (clears addresses which have not been online for over 3 days)\n\nIt resends messages when there has been no response:\n  - resends getpubkey messages in 5 days (then 10 days, then 20 days, etc...)\n  - resends msg messages in 5 days (then 10 days, then 20 days, etc...)\n\n"
+op4=>operation: import gc
+op6=>operation: import os
+op8=>operation: import time
+op10=>operation: import queues
+op12=>operation: import state
+op14=>operation: from bmconfigparser import config
+op16=>operation: from helper_sql import sqlExecute, sqlQuery
+op18=>operation: from network import connectionpool, knownnodes, StoppableThread
+op20=>operation: from tr import _translate
+op22=>operation: lengthOfTimeToHoldOnToAllPubkeys = 2419200
+op24=>operation: class singleCleaner(StoppableThread):
+    'The singleCleaner thread class'
+    name = 'singleCleaner'
+    cycleLength = 300
+    expireDiscoveredPeers = 300
+
+    def run(self):
+        gc.disable()
+        timeWeLastClearedInventoryAndPubkeysTables = 0
+        try:
+            state.maximumLengthOfTimeToBotherResendingMessages = ((((config.getfloat('bitmessagesettings', 'stopresendingafterxdays') * 24) * 60) * 60) + ((config.getfloat('bitmessagesettings', 'stopresendingafterxmonths') * (((60 * 60) * 24) * 365)) / 12))
+        except:
+            state.maximumLengthOfTimeToBotherResendingMessages = float('inf')
+        while (state.shutdown == 0):
+            self.stop.wait(self.cycleLength)
+            queues.UISignalQueue.put(('updateStatusBar', 'Doing housekeeping (Flushing inventory in memory to disk...)'))
+            state.Inventory.flush()
+            queues.UISignalQueue.put(('updateStatusBar', ''))
+            if (state.thisapp.daemon or (not state.enableGUI)):
+                queues.UISignalQueue.queue.clear()
+            tick = int(time.time())
+            if (timeWeLastClearedInventoryAndPubkeysTables < (tick - 7380)):
+                timeWeLastClearedInventoryAndPubkeysTables = tick
+                state.Inventory.clean()
+                queues.workerQueue.put(('sendOnionPeerObj', ''))
+                sqlExecute("DELETE FROM pubkeys WHERE time<? AND usedpersonally='no'", (tick - lengthOfTimeToHoldOnToAllPubkeys))
+                queryreturn = sqlQuery("SELECT toaddress, ackdata, status FROM sent WHERE ((status='awaitingpubkey' OR status='msgsent') AND folder='sent' AND sleeptill<? AND senttime>?)", tick, (tick - state.maximumLengthOfTimeToBotherResendingMessages))
+                for (toAddress, ackData, status) in queryreturn:
+                    if (status == 'awaitingpubkey'):
+                        self.resendPubkeyRequest(toAddress)
+                    elif (status == 'msgsent'):
+                        self.resendMsg(ackData)
+            try:
+                if state.enableNetwork:
+                    knownnodes.cleanupKnownNodes(connectionpool.pool)
+            except Exception as err:
+                if ('Errno 28' in str(err)):
+                    self.logger.fatal('(while writing knownnodes to disk) Alert: Your disk or data storage volume is full.')
+                    queues.UISignalQueue.put(('alert', (_translate('MainWindow', 'Disk full'), _translate('MainWindow', 'Alert: Your disk or data storage volume is full. Bitmessage will now exit.'), True)))
+                    if (state.thisapp.daemon or (not state.enableGUI)):
+                        os._exit(1)
+            for connection in connectionpool.pool.connections():
+                connection.clean()
+            exp = (time.time() - singleCleaner.expireDiscoveredPeers)
+            reaper = (k for (k, v) in state.discoveredPeers.items() if (v < exp))
+            for k in reaper:
+                try:
+                    del state.discoveredPeers[k]
+                except KeyError:
+                    pass
+            gc.collect()
+
+    def resendPubkeyRequest(self, address):
+        'Resend pubkey request for address'
+        self.logger.debug("It has been a long time and we haven't heard a response to our getpubkey request. Sending again.")
+        try:
+            del state.neededPubkeys[address]
+        except KeyError:
+            pass
+        except RuntimeError:
+            self.logger.warning("Can't remove %s from neededPubkeys, requesting pubkey will be delayed", address, exc_info=True)
+        queues.UISignalQueue.put(('updateStatusBar', 'Doing work necessary to again attempt to request a public key...'))
+        sqlExecute("UPDATE sent SET status = 'msgqueued' WHERE toaddress = ? AND folder = 'sent'", address)
+        queues.workerQueue.put(('sendmessage', ''))
+
+    def resendMsg(self, ackdata):
+        'Resend message by ackdata'
+        self.logger.debug("It has been a long time and we haven't heard an acknowledgement to our msg. Sending again.")
+        sqlExecute("UPDATE sent SET status = 'msgqueued' WHERE ackdata = ? AND folder = 'sent'", ackdata)
+        queues.workerQueue.put(('sendmessage', ''))
+        queues.UISignalQueue.put(('updateStatusBar', 'Doing work necessary to again attempt to deliver a message...'))
+
+op2->op4
+op4->op6
+op6->op8
+op8->op10
+op10->op12
+op12->op14
+op14->op16
+op16->op18
+op18->op20
+op20->op22
+op22->op24
+</textarea></div>
+        <div><button id="run" type="button">Run</button> <button onclick="HelpText()">Format Help</button></div>
+        <div id="HelpTextBlock" style="display:none"><br/>Conditions can also be redirected like cond(yes, bottom) or cond(yes, right)
+... and the other symbols too... like sub1(right)<br/>
+You can also tweak the <b>diagram.drawSVG('diagram', {});</b> script in this file for more changes<br/>
+This is based on <a href="https://github.com/adrai/flowchart.js">flowchart.js on github</a> and <a href="http://flowchart.js.org">http://flowchart.js.org</a> more documentation can be found over there.
+</div><br/><div id="svgbase64"></div>
+        <div id="pngbase64"></div>
+
+        <div id="canvas"></div>
+    </body>
+</html>

@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <title>addressdialogs.html</title>
+        <style type="text/css">
+          .end-element { fill : #FFCCFF; }
+        </style>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/raphael/2.3.0/raphael.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/flowchart/1.17.1/flowchart.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.1/js/bootstrap.bundle.min.js"></script>
+        <!-- <script src="../release/flowchart.min.js"></script> -->
+        <script>
+
+            window.onload = function () {
+                var btn = document.getElementById("run"),
+                    cd = document.getElementById("code"),
+                    chart;
+                    
+                (btn.onclick = function () {
+                    var code = cd.value;
+
+                    if (chart) {
+                      chart.clean();
+                    }
+
+                    chart = flowchart.parse(code);
+                    chart.drawSVG('canvas', {
+                      'x': 0,
+                      'y': 0,
+                      'line-width': 3,
+                      //'maxWidth': 15,//ensures the flowcharts fits within a certain width
+                      'line-length': 50,
+                      'text-margin': 10,
+                      'font-size': 14,
+                      'font': 'normal',
+                      'font-family': 'Helvetica',
+                      'font-weight': 'normal',
+                      'font-color': 'black',
+                      'line-color': 'black',
+                      'element-color': 'black',
+                      'fill': 'white',
+                      'yes-text': 'yes',
+                      'no-text': 'no',
+                      'arrow-end': 'block',
+                      'scale': 1,
+                      'symbols': {
+                        'start': {
+                          'font-size': 14,
+                          'font-color': 'yellow',
+                          'element-color': 'blue',
+                          'fill': 'green',
+                          'class': 'start-element'
+                        },
+                        'inputoutput': {
+                          'font-color': 'black',
+                          'element-color': 'black',
+                          'fill': 'bisque'
+                        },
+                        'operation': {
+                          'font-color': 'black',
+                          'element-color': 'black',
+                          'fill': 'linen'
+                        },
+                        'subroutine': {
+                          'font-color': 'black',
+                          'element-color': 'blue',
+                          'fill': 'lightgreen'
+                        },
+                        'condition': {
+                          'font-color': 'red',
+                          'element-color': 'black',
+                          'fill': 'yellow'
+                        },
+                        'end':{
+                          'font-size': 20,
+                          'class': 'end-element'
+                        }
+                      },
+                      'flowstate' : {
+                        //'past' : { 'fill' : '#CCCCCC', 'font-size' : 12},
+                        //'current' : {'fill' : 'yellow', 'font-color' : 'red', 'font-weight' : 'bold'},
+                        //'future' : { 'fill' : '#FFFF99'},
+                        'request' : { 'fill' : 'blue'},
+                        'invalid': {'fill' : '#444444'},
+                        'approved' : { 'fill' : '#58C4A3', 'font-size' : 12, 'yes-text' : 'APPROVED', 'no-text' : 'n/a' },
+                        'rejected' : { 'fill' : '#C45879', 'font-size' : 12, 'yes-text' : 'n/a', 'no-text' : 'REJECTED' }
+                      }
+                    });
+                    //create base64 encoding of SVG to generate download link for title(without html or htm).SVG
+                    var currentCanvasDIV = document.getElementById('canvas')
+                    var currentDrawSVG = currentCanvasDIV.innerHTML.replaceAll('ë','e');
+
+                    const OUTsvgBASE64 = btoa(currentDrawSVG)
+                    doctitle = document.title.replace('.html','');
+                    doctitle = doctitle.replace('.htm','');
+
+
+                    var currentCanvasDIV = document.getElementById('canvas')
+                    var currentDrawSVG = currentCanvasDIV.innerHTML.replaceAll('ë','e');
+                    svgSource = currentDrawSVG
+                    svgXML = currentDrawSVG;
+                    // Use SVG Height and Width from the SVG XML to set canvas size
+                    svgXMLsubstringHeight = svgXML.substring(svgXML.indexOf('height='), svgXML.indexOf('version='));
+                    svgXMLsubstringWidth = svgXML.substring(svgXML.indexOf('width='), svgXML.indexOf('xmlns='));
+                    HeightValue = svgXMLsubstringHeight.substring(svgXMLsubstringHeight.indexOf('"')+1,svgXMLsubstringHeight.lastIndexOf('"'));
+                    WidthValue = svgXMLsubstringWidth.substring(svgXMLsubstringWidth.indexOf('"')+1,svgXMLsubstringWidth.lastIndexOf('"'));
+                    HeightValueInt = Math.round(HeightValue)
+                    WidthValueInt = Math.round(WidthValue)
+                    // setup input for base64SvgToBase64Png
+                    let svgSrc = "data:image/svg+xml;base64,"+OUTsvgBASE64;
+                    var pngBase
+                    imageUtil.base64SvgToBase64Png(svgSrc, WidthValueInt, HeightValueInt).then(pngSrc => {
+                    pngBase = pngSrc
+                    // output download link for base64 PNG converted on download from base64
+                    var pngOutHtml = `<a href="${pngBase}" download="${doctitle}.png">PNG - Click here to download current rendered flowchart as ${doctitle}.png</a>`
+                    document.getElementById("pngbase64").innerHTML=pngOutHtml;
+                    });    
+                    // output download link for base64 SVG converted on download from base64
+                    var svgOutHtml = `<a href="data:image/svg+xml;base64,${OUTsvgBASE64}" download=${doctitle}.svg>SVG - Click here to download current rendered flowchart as ${doctitle}.svg</a> `
+                        document.getElementById("svgbase64").innerHTML=svgOutHtml;
+                    })();
+
+                            };
+                 
+
+// derived from https://stackoverflow.com/a/64800570
+// we need to use web browser canvas to generate a image. In this case png
+let imageUtil = {};
+/**
+ * converts a base64 encoded data url SVG image to a PNG image
+ * @param originalBase64 data url of svg image
+ * @param width target width in pixel of PNG image
+ * @param secondTry used internally to prevent endless recursion
+ * @return {Promise<unknown>} resolves to png data url of the image
+ */
+imageUtil.base64SvgToBase64Png = function (originalBase64, width, height, secondTry) {
+    return new Promise(resolve => {
+        let img = document.createElement('img');
+        img.onload = function () {
+            if (!secondTry && (img.naturalWidth === 0 || img.naturalHeight === 0)) {
+                let svgDoc = base64ToSvgDocument(originalBase64);
+                let fixedDoc = fixSvgDocumentFF(svgDoc);
+                return imageUtil.base64SvgToBase64Png(svgDocumentToBase64(fixedDoc), width, height, true).then(result => {
+                    resolve(result);
+                });
+            }
+            //document.body.appendChild(img);
+            let canvas2 = document.createElement("canvas");
+            //document.body.removeChild(img);
+            canvas2.width = width;
+            canvas2.height = height;
+            let ctx = canvas2.getContext("2d");
+            ctx.drawImage(img, 0, 0, canvas2.width, canvas2.height);
+            try {
+                let data = canvas2.toDataURL('image/png');
+                resolve(data);
+            } catch (e) {
+                resolve(null);
+            }
+        };
+        img.src = originalBase64;
+    });
+}
+
+//needed because Firefox doesn't correctly handle SVG with size = 0, see https://bugzilla.mozilla.org/show_bug.cgi?id=700533
+function fixSvgDocumentFF(svgDocument) {
+    try {
+        let widthInt = parseInt(svgDocument.documentElement.width.baseVal.value) || 500;
+        let heightInt = parseInt(svgDocument.documentElement.height.baseVal.value) || 500;
+        svgDocument.documentElement.width.baseVal.newValueSpecifiedUnits(SVGLength.SVG_LENGTHTYPE_PX, widthInt);
+        svgDocument.documentElement.height.baseVal.newValueSpecifiedUnits(SVGLength.SVG_LENGTHTYPE_PX, heightInt);
+        return svgDocument;
+    } catch (e) {
+        return svgDocument;
+    }
+}
+
+function svgDocumentToBase64(svgDocument) {
+    try {
+        let base64EncodedSVG = btoa(new XMLSerializer().serializeToString(svgDocument));
+        return 'data:image/svg+xml;base64,' + base64EncodedSVG;
+    } catch (e) {
+        return null;
+    }
+}
+
+function base64ToSvgDocument(base64) {
+    let svg = atob(base64.substring(base64.indexOf('base64,') + 7));
+    svg = svg.substring(svg.indexOf('<svg'));
+    let parser = new DOMParser();
+    return parser.parseFromString(svg, "image/svg+xml");
+} 
+        </script>
+
+        <script>
+            function HelpText() {
+              var x = document.getElementById("HelpTextBlock");
+              if (x.style.display === "none") {
+                x.style.display = "block";
+              } else {
+                x.style.display = "none";
+              }
+            }
+        </script>
+    </head>
+    <body>
+        <div><textarea id="code" style="width: 100%;" rows="11">op2=>operation: '\nDialogs that work with BM address.\n'
+op4=>operation: import hashlib
+op6=>operation: from PyQt4 import QtCore, QtGui
+op8=>operation: import queues
+op10=>operation: import widgets
+op12=>operation: import state
+op14=>operation: from account import AccountMixin, GatewayAccount, MailchuckAccount, accountClass
+op16=>operation: from addresses import addBMIfNotPresent, decodeAddress, encodeVarint
+op18=>operation: from bmconfigparser import config as global_config
+op20=>operation: from tr import _translate
+op22=>operation: class AddressCheckMixin(object):
+    'Base address validation class for QT UI'
+
+    def __init__(self):
+        self.valid = False
+        QtCore.QObject.connect(self.lineEditAddress, QtCore.SIGNAL('textChanged(QString)'), self.addressChanged)
+
+    def _onSuccess(self, addressVersion, streamNumber, ripe):
+        pass
+
+    def addressChanged(self, QString):
+        '\n        Address validation callback, performs validation and gives feedback\n        '
+        (status, addressVersion, streamNumber, ripe) = decodeAddress(str(QString))
+        self.valid = (status == 'success')
+        if self.valid:
+            self.labelAddressCheck.setText(_translate('MainWindow', 'Address is valid.'))
+            self._onSuccess(addressVersion, streamNumber, ripe)
+        elif (status == 'missingbm'):
+            self.labelAddressCheck.setText(_translate('MainWindow', "The address should start with ''BM-''"))
+        elif (status == 'checksumfailed'):
+            self.labelAddressCheck.setText(_translate('MainWindow', 'The address is not typed or copied correctly (the checksum failed).'))
+        elif (status == 'versiontoohigh'):
+            self.labelAddressCheck.setText(_translate('MainWindow', 'The version number of this address is higher than this software can support. Please upgrade Bitmessage.'))
+        elif (status == 'invalidcharacters'):
+            self.labelAddressCheck.setText(_translate('MainWindow', 'The address contains invalid characters.'))
+        elif (status == 'ripetooshort'):
+            self.labelAddressCheck.setText(_translate('MainWindow', 'Some data encoded in the address is too short.'))
+        elif (status == 'ripetoolong'):
+            self.labelAddressCheck.setText(_translate('MainWindow', 'Some data encoded in the address is too long.'))
+        elif (status == 'varintmalformed'):
+            self.labelAddressCheck.setText(_translate('MainWindow', 'Some data encoded in the address is malformed.'))
+op24=>operation: class AddressDataDialog(QtGui.QDialog, AddressCheckMixin):
+    'QDialog with Bitmessage address validation'
+
+    def __init__(self, parent):
+        super(AddressDataDialog, self).__init__(parent)
+        self.parent = parent
+
+    def accept(self):
+        'Callback for QDIalog accepting value'
+        if self.valid:
+            self.data = (addBMIfNotPresent(str(self.lineEditAddress.text())), str(self.lineEditLabel.text().toUtf8()))
+        else:
+            queues.UISignalQueue.put(('updateStatusBar', _translate('MainWindow', 'The address you entered was invalid. Ignoring it.')))
+        super(AddressDataDialog, self).accept()
+op26=>operation: class AddAddressDialog(AddressDataDialog):
+    'QDialog for adding a new address'
+
+    def __init__(self, parent=None, address=None):
+        super(AddAddressDialog, self).__init__(parent)
+        widgets.load('addaddressdialog.ui', self)
+        AddressCheckMixin.__init__(self)
+        if address:
+            self.lineEditAddress.setText(address)
+op28=>operation: class NewAddressDialog(QtGui.QDialog):
+    'QDialog for generating a new address'
+
+    def __init__(self, parent=None):
+        super(NewAddressDialog, self).__init__(parent)
+        widgets.load('newaddressdialog.ui', self)
+        for address in global_config.addresses(True):
+            self.radioButtonExisting.click()
+            self.comboBoxExisting.addItem(address)
+        self.groupBoxDeterministic.setHidden(True)
+        QtGui.QWidget.resize(self, QtGui.QWidget.sizeHint(self))
+        self.show()
+
+    def accept(self):
+        'accept callback'
+        self.hide()
+        if self.radioButtonRandomAddress.isChecked():
+            if self.radioButtonMostAvailable.isChecked():
+                streamNumberForAddress = 1
+            else:
+                streamNumberForAddress = decodeAddress(self.comboBoxExisting.currentText())[2]
+            queues.addressGeneratorQueue.put(('createRandomAddress', 4, streamNumberForAddress, str(self.newaddresslabel.text().toUtf8()), 1, '', self.checkBoxEighteenByteRipe.isChecked()))
+        elif (self.lineEditPassphrase.text() != self.lineEditPassphraseAgain.text()):
+            QtGui.QMessageBox.about(self, _translate('MainWindow', 'Passphrase mismatch'), _translate('MainWindow', "The passphrase you entered twice doesn't match. Try again."))
+        elif (self.lineEditPassphrase.text() == ''):
+            QtGui.QMessageBox.about(self, _translate('MainWindow', 'Choose a passphrase'), _translate('MainWindow', 'You really do need a passphrase.'))
+        else:
+            streamNumberForAddress = 1
+            queues.addressGeneratorQueue.put(('createDeterministicAddresses', 4, streamNumberForAddress, 'unused deterministic address', self.spinBoxNumberOfAddressesToMake.value(), self.lineEditPassphrase.text().toUtf8(), self.checkBoxEighteenByteRipe.isChecked()))
+op30=>operation: class NewSubscriptionDialog(AddressDataDialog):
+    'QDialog for subscribing to an address'
+
+    def __init__(self, parent=None):
+        super(NewSubscriptionDialog, self).__init__(parent)
+        widgets.load('newsubscriptiondialog.ui', self)
+        AddressCheckMixin.__init__(self)
+
+    def _onSuccess(self, addressVersion, streamNumber, ripe):
+        if (addressVersion <= 3):
+            self.checkBoxDisplayMessagesAlreadyInInventory.setText(_translate('MainWindow', 'Address is an old type. We cannot display its past broadcasts.'))
+        else:
+            state.Inventory.flush()
+            doubleHashOfAddressData = hashlib.sha512(hashlib.sha512(((encodeVarint(addressVersion) + encodeVarint(streamNumber)) + ripe)).digest()).digest()
+            tag = doubleHashOfAddressData[32:]
+            self.recent = state.Inventory.by_type_and_tag(3, tag)
+            count = len(self.recent)
+            if (count == 0):
+                self.checkBoxDisplayMessagesAlreadyInInventory.setText(_translate('MainWindow', 'There are no recent broadcasts from this address to display.'))
+            else:
+                self.checkBoxDisplayMessagesAlreadyInInventory.setEnabled(True)
+                self.checkBoxDisplayMessagesAlreadyInInventory.setText(_translate('MainWindow', 'Display the %n recent broadcast(s) from this address.', None, QtCore.QCoreApplication.CodecForTr, count))
+op32=>operation: class RegenerateAddressesDialog(QtGui.QDialog):
+    'QDialog for regenerating deterministic addresses'
+
+    def __init__(self, parent=None):
+        super(RegenerateAddressesDialog, self).__init__(parent)
+        widgets.load('regenerateaddresses.ui', self)
+        self.groupBox.setTitle('')
+        QtGui.QWidget.resize(self, QtGui.QWidget.sizeHint(self))
+op34=>operation: class SpecialAddressBehaviorDialog(QtGui.QDialog):
+    '\n    QDialog for special address behaviour (e.g. mailing list functionality)\n    '
+
+    def __init__(self, parent=None, config=global_config):
+        super(SpecialAddressBehaviorDialog, self).__init__(parent)
+        widgets.load('specialaddressbehavior.ui', self)
+        self.address = parent.getCurrentAccount()
+        self.parent = parent
+        self.config = config
+        try:
+            self.address_is_chan = config.safeGetBoolean(self.address, 'chan')
+        except AttributeError:
+            pass
+        else:
+            if self.address_is_chan:
+                self.radioButtonBehaviorMailingList.setDisabled(True)
+                self.lineEditMailingListName.setText(_translate('SpecialAddressBehaviorDialog', 'This is a chan address. You cannot use it as a pseudo-mailing list.'))
+            else:
+                if config.safeGetBoolean(self.address, 'mailinglist'):
+                    self.radioButtonBehaviorMailingList.click()
+                else:
+                    self.radioButtonBehaveNormalAddress.click()
+                mailingListName = config.safeGet(self.address, 'mailinglistname', '')
+                self.lineEditMailingListName.setText(unicode(mailingListName, 'utf-8'))
+        QtGui.QWidget.resize(self, QtGui.QWidget.sizeHint(self))
+        self.show()
+
+    def accept(self):
+        'Accept callback'
+        self.hide()
+        if self.address_is_chan:
+            return
+        if self.radioButtonBehaveNormalAddress.isChecked():
+            self.config.set(str(self.address), 'mailinglist', 'false')
+            if self.config.getboolean(self.address, 'enabled'):
+                self.parent.setCurrentItemColor(QtGui.QApplication.palette().text().color())
+            else:
+                self.parent.setCurrentItemColor(QtGui.QColor(128, 128, 128))
+        else:
+            self.config.set(str(self.address), 'mailinglist', 'true')
+            self.config.set(str(self.address), 'mailinglistname', str(self.lineEditMailingListName.text().toUtf8()))
+            self.parent.setCurrentItemColor(QtGui.QColor(137, 4, 177))
+        self.parent.rerenderComboBoxSendFrom()
+        self.parent.rerenderComboBoxSendFromBroadcast()
+        self.config.save()
+        self.parent.rerenderMessagelistToLabels()
+op36=>operation: class EmailGatewayDialog(QtGui.QDialog):
+    'QDialog for email gateway control'
+
+    def __init__(self, parent, config=global_config, account=None):
+        super(EmailGatewayDialog, self).__init__(parent)
+        widgets.load('emailgateway.ui', self)
+        self.parent = parent
+        self.config = config
+        if account:
+            self.acct = account
+            self.setWindowTitle(_translate('EmailGatewayDialog', 'Registration failed:'))
+            self.label.setText(_translate('EmailGatewayDialog', 'The requested email address is not available, please try a new one.'))
+            self.radioButtonRegister.hide()
+            self.radioButtonStatus.hide()
+            self.radioButtonSettings.hide()
+            self.radioButtonUnregister.hide()
+        else:
+            address = parent.getCurrentAccount()
+            self.acct = accountClass(address)
+            try:
+                label = config.get(address, 'label')
+            except AttributeError:
+                pass
+            else:
+                if ('@' in label):
+                    self.lineEditEmail.setText(label)
+            if isinstance(self.acct, GatewayAccount):
+                self.radioButtonUnregister.setEnabled(True)
+                self.radioButtonStatus.setEnabled(True)
+                self.radioButtonStatus.setChecked(True)
+                self.radioButtonSettings.setEnabled(True)
+                self.lineEditEmail.setEnabled(False)
+            else:
+                self.acct = MailchuckAccount(address)
+        self.lineEditEmail.setFocus()
+        QtGui.QWidget.resize(self, QtGui.QWidget.sizeHint(self))
+
+    def accept(self):
+        'Accept callback'
+        self.hide()
+        if (self.acct.type != AccountMixin.NORMAL):
+            return
+        if (not isinstance(self.acct, GatewayAccount)):
+            return
+        if (self.radioButtonRegister.isChecked() or self.radioButtonRegister.isHidden()):
+            email = str(self.lineEditEmail.text().toUtf8())
+            self.acct.register(email)
+            self.config.set(self.acct.fromAddress, 'label', email)
+            self.config.set(self.acct.fromAddress, 'gateway', 'mailchuck')
+            self.config.save()
+            queues.UISignalQueue.put(('updateStatusBar', _translate('EmailGatewayDialog', 'Sending email gateway registration request')))
+        elif self.radioButtonUnregister.isChecked():
+            self.acct.unregister()
+            self.config.remove_option(self.acct.fromAddress, 'gateway')
+            self.config.save()
+            queues.UISignalQueue.put(('updateStatusBar', _translate('EmailGatewayDialog', 'Sending email gateway unregistration request')))
+        elif self.radioButtonStatus.isChecked():
+            self.acct.status()
+            queues.UISignalQueue.put(('updateStatusBar', _translate('EmailGatewayDialog', 'Sending email gateway status request')))
+        elif self.radioButtonSettings.isChecked():
+            self.data = self.acct
+        super(EmailGatewayDialog, self).accept()
+
+op2->op4
+op4->op6
+op6->op8
+op8->op10
+op10->op12
+op12->op14
+op14->op16
+op16->op18
+op18->op20
+op20->op22
+op22->op24
+op24->op26
+op26->op28
+op28->op30
+op30->op32
+op32->op34
+op34->op36
+</textarea></div>
+        <div><button id="run" type="button">Run</button> <button onclick="HelpText()">Format Help</button></div>
+        <div id="HelpTextBlock" style="display:none"><br/>Conditions can also be redirected like cond(yes, bottom) or cond(yes, right)
+... and the other symbols too... like sub1(right)<br/>
+You can also tweak the <b>diagram.drawSVG('diagram', {});</b> script in this file for more changes<br/>
+This is based on <a href="https://github.com/adrai/flowchart.js">flowchart.js on github</a> and <a href="http://flowchart.js.org">http://flowchart.js.org</a> more documentation can be found over there.
+</div><br/><div id="svgbase64"></div>
+        <div id="pngbase64"></div>
+
+        <div id="canvas"></div>
+    </body>
+</html>

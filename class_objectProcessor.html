@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <title>class_objectProcessor.html</title>
+        <style type="text/css">
+          .end-element { fill : #FFCCFF; }
+        </style>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/raphael/2.3.0/raphael.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/flowchart/1.17.1/flowchart.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.1/js/bootstrap.bundle.min.js"></script>
+        <!-- <script src="../release/flowchart.min.js"></script> -->
+        <script>
+
+            window.onload = function () {
+                var btn = document.getElementById("run"),
+                    cd = document.getElementById("code"),
+                    chart;
+                    
+                (btn.onclick = function () {
+                    var code = cd.value;
+
+                    if (chart) {
+                      chart.clean();
+                    }
+
+                    chart = flowchart.parse(code);
+                    chart.drawSVG('canvas', {
+                      'x': 0,
+                      'y': 0,
+                      'line-width': 3,
+                      //'maxWidth': 15,//ensures the flowcharts fits within a certain width
+                      'line-length': 50,
+                      'text-margin': 10,
+                      'font-size': 14,
+                      'font': 'normal',
+                      'font-family': 'Helvetica',
+                      'font-weight': 'normal',
+                      'font-color': 'black',
+                      'line-color': 'black',
+                      'element-color': 'black',
+                      'fill': 'white',
+                      'yes-text': 'yes',
+                      'no-text': 'no',
+                      'arrow-end': 'block',
+                      'scale': 1,
+                      'symbols': {
+                        'start': {
+                          'font-size': 14,
+                          'font-color': 'yellow',
+                          'element-color': 'blue',
+                          'fill': 'green',
+                          'class': 'start-element'
+                        },
+                        'inputoutput': {
+                          'font-color': 'black',
+                          'element-color': 'black',
+                          'fill': 'bisque'
+                        },
+                        'operation': {
+                          'font-color': 'black',
+                          'element-color': 'black',
+                          'fill': 'linen'
+                        },
+                        'subroutine': {
+                          'font-color': 'black',
+                          'element-color': 'blue',
+                          'fill': 'lightgreen'
+                        },
+                        'condition': {
+                          'font-color': 'red',
+                          'element-color': 'black',
+                          'fill': 'yellow'
+                        },
+                        'end':{
+                          'font-size': 20,
+                          'class': 'end-element'
+                        }
+                      },
+                      'flowstate' : {
+                        //'past' : { 'fill' : '#CCCCCC', 'font-size' : 12},
+                        //'current' : {'fill' : 'yellow', 'font-color' : 'red', 'font-weight' : 'bold'},
+                        //'future' : { 'fill' : '#FFFF99'},
+                        'request' : { 'fill' : 'blue'},
+                        'invalid': {'fill' : '#444444'},
+                        'approved' : { 'fill' : '#58C4A3', 'font-size' : 12, 'yes-text' : 'APPROVED', 'no-text' : 'n/a' },
+                        'rejected' : { 'fill' : '#C45879', 'font-size' : 12, 'yes-text' : 'n/a', 'no-text' : 'REJECTED' }
+                      }
+                    });
+                    //create base64 encoding of SVG to generate download link for title(without html or htm).SVG
+                    var currentCanvasDIV = document.getElementById('canvas')
+                    var currentDrawSVG = currentCanvasDIV.innerHTML.replaceAll('ë','e');
+
+                    const OUTsvgBASE64 = btoa(currentDrawSVG)
+                    doctitle = document.title.replace('.html','');
+                    doctitle = doctitle.replace('.htm','');
+
+
+                    var currentCanvasDIV = document.getElementById('canvas')
+                    var currentDrawSVG = currentCanvasDIV.innerHTML.replaceAll('ë','e');
+                    svgSource = currentDrawSVG
+                    svgXML = currentDrawSVG;
+                    // Use SVG Height and Width from the SVG XML to set canvas size
+                    svgXMLsubstringHeight = svgXML.substring(svgXML.indexOf('height='), svgXML.indexOf('version='));
+                    svgXMLsubstringWidth = svgXML.substring(svgXML.indexOf('width='), svgXML.indexOf('xmlns='));
+                    HeightValue = svgXMLsubstringHeight.substring(svgXMLsubstringHeight.indexOf('"')+1,svgXMLsubstringHeight.lastIndexOf('"'));
+                    WidthValue = svgXMLsubstringWidth.substring(svgXMLsubstringWidth.indexOf('"')+1,svgXMLsubstringWidth.lastIndexOf('"'));
+                    HeightValueInt = Math.round(HeightValue)
+                    WidthValueInt = Math.round(WidthValue)
+                    // setup input for base64SvgToBase64Png
+                    let svgSrc = "data:image/svg+xml;base64,"+OUTsvgBASE64;
+                    var pngBase
+                    imageUtil.base64SvgToBase64Png(svgSrc, WidthValueInt, HeightValueInt).then(pngSrc => {
+                    pngBase = pngSrc
+                    // output download link for base64 PNG converted on download from base64
+                    var pngOutHtml = `<a href="${pngBase}" download="${doctitle}.png">PNG - Click here to download current rendered flowchart as ${doctitle}.png</a>`
+                    document.getElementById("pngbase64").innerHTML=pngOutHtml;
+                    });    
+                    // output download link for base64 SVG converted on download from base64
+                    var svgOutHtml = `<a href="data:image/svg+xml;base64,${OUTsvgBASE64}" download=${doctitle}.svg>SVG - Click here to download current rendered flowchart as ${doctitle}.svg</a> `
+                        document.getElementById("svgbase64").innerHTML=svgOutHtml;
+                    })();
+
+                            };
+                 
+
+// derived from https://stackoverflow.com/a/64800570
+// we need to use web browser canvas to generate a image. In this case png
+let imageUtil = {};
+/**
+ * converts a base64 encoded data url SVG image to a PNG image
+ * @param originalBase64 data url of svg image
+ * @param width target width in pixel of PNG image
+ * @param secondTry used internally to prevent endless recursion
+ * @return {Promise<unknown>} resolves to png data url of the image
+ */
+imageUtil.base64SvgToBase64Png = function (originalBase64, width, height, secondTry) {
+    return new Promise(resolve => {
+        let img = document.createElement('img');
+        img.onload = function () {
+            if (!secondTry && (img.naturalWidth === 0 || img.naturalHeight === 0)) {
+                let svgDoc = base64ToSvgDocument(originalBase64);
+                let fixedDoc = fixSvgDocumentFF(svgDoc);
+                return imageUtil.base64SvgToBase64Png(svgDocumentToBase64(fixedDoc), width, height, true).then(result => {
+                    resolve(result);
+                });
+            }
+            //document.body.appendChild(img);
+            let canvas2 = document.createElement("canvas");
+            //document.body.removeChild(img);
+            canvas2.width = width;
+            canvas2.height = height;
+            let ctx = canvas2.getContext("2d");
+            ctx.drawImage(img, 0, 0, canvas2.width, canvas2.height);
+            try {
+                let data = canvas2.toDataURL('image/png');
+                resolve(data);
+            } catch (e) {
+                resolve(null);
+            }
+        };
+        img.src = originalBase64;
+    });
+}
+
+//needed because Firefox doesn't correctly handle SVG with size = 0, see https://bugzilla.mozilla.org/show_bug.cgi?id=700533
+function fixSvgDocumentFF(svgDocument) {
+    try {
+        let widthInt = parseInt(svgDocument.documentElement.width.baseVal.value) || 500;
+        let heightInt = parseInt(svgDocument.documentElement.height.baseVal.value) || 500;
+        svgDocument.documentElement.width.baseVal.newValueSpecifiedUnits(SVGLength.SVG_LENGTHTYPE_PX, widthInt);
+        svgDocument.documentElement.height.baseVal.newValueSpecifiedUnits(SVGLength.SVG_LENGTHTYPE_PX, heightInt);
+        return svgDocument;
+    } catch (e) {
+        return svgDocument;
+    }
+}
+
+function svgDocumentToBase64(svgDocument) {
+    try {
+        let base64EncodedSVG = btoa(new XMLSerializer().serializeToString(svgDocument));
+        return 'data:image/svg+xml;base64,' + base64EncodedSVG;
+    } catch (e) {
+        return null;
+    }
+}
+
+function base64ToSvgDocument(base64) {
+    let svg = atob(base64.substring(base64.indexOf('base64,') + 7));
+    svg = svg.substring(svg.indexOf('<svg'));
+    let parser = new DOMParser();
+    return parser.parseFromString(svg, "image/svg+xml");
+} 
+        </script>
+
+        <script>
+            function HelpText() {
+              var x = document.getElementById("HelpTextBlock");
+              if (x.style.display === "none") {
+                x.style.display = "block";
+              } else {
+                x.style.display = "none";
+              }
+            }
+        </script>
+    </head>
+    <body>
+        <div><textarea id="code" style="width: 100%;" rows="11">op2=>operation: '\nThe objectProcessor thread, of which there is only one,\nprocesses the network objects\n'
+op4=>operation: import hashlib
+op6=>operation: import logging
+op8=>operation: import os
+op10=>operation: import random
+op12=>operation: import subprocess
+op14=>operation: import threading
+op16=>operation: import time
+op18=>operation: from binascii import hexlify
+op20=>operation: import helper_bitcoin
+op22=>operation: import helper_inbox
+op24=>operation: import helper_msgcoding
+op26=>operation: import helper_sent
+op28=>operation: import highlevelcrypto
+op30=>operation: import l10n
+op32=>operation: import protocol
+op34=>operation: import queues
+op36=>operation: import shared
+op38=>operation: import state
+op40=>operation: from addresses import decodeAddress, decodeVarint, encodeAddress, encodeVarint, varintDecodeError
+op42=>operation: from bmconfigparser import config
+op44=>operation: from helper_sql import sql_ready, sql_timeout, SqlBulkExecute, sqlExecute, sqlQuery
+op46=>operation: from network import knownnodes
+op48=>operation: from network.node import Peer
+op50=>operation: from tr import _translate
+op52=>operation: logger = logging.getLogger('default')
+op54=>operation: class objectProcessor(threading.Thread):
+    '\n    The objectProcessor thread, of which there is only one, receives network\n    objects (msg, broadcast, pubkey, getpubkey) from the receiveDataThreads.\n    '
+
+    def __init__(self):
+        threading.Thread.__init__(self, name='objectProcessor')
+        random.seed()
+        if (sql_ready.wait(sql_timeout) is False):
+            logger.fatal('SQL thread is not started in %s sec', sql_timeout)
+            os._exit(1)
+        shared.reloadMyAddressHashes()
+        shared.reloadBroadcastSendersForWhichImWatching()
+        queryreturn = sqlQuery('SELECT objecttype, data FROM objectprocessorqueue')
+        for (objectType, data) in queryreturn:
+            queues.objectProcessorQueue.put((objectType, data))
+        sqlExecute('DELETE FROM objectprocessorqueue')
+        logger.debug('Loaded %s objects from disk into the objectProcessorQueue.', len(queryreturn))
+        self.successfullyDecryptMessageTimings = []
+
+    def run(self):
+        'Process the objects from `.queues.objectProcessorQueue`'
+        while True:
+            (objectType, data) = queues.objectProcessorQueue.get()
+            self.checkackdata(data)
+            try:
+                if (objectType == protocol.OBJECT_GETPUBKEY):
+                    self.processgetpubkey(data)
+                elif (objectType == protocol.OBJECT_PUBKEY):
+                    self.processpubkey(data)
+                elif (objectType == protocol.OBJECT_MSG):
+                    self.processmsg(data)
+                elif (objectType == protocol.OBJECT_BROADCAST):
+                    self.processbroadcast(data)
+                elif (objectType == protocol.OBJECT_ONIONPEER):
+                    self.processonion(data)
+                elif (objectType == 'checkShutdownVariable'):
+                    pass
+                elif isinstance(objectType, int):
+                    logger.info("Don't know how to handle object type 0x%08X", objectType)
+                else:
+                    logger.info("Don't know how to handle object type %s", objectType)
+            except helper_msgcoding.DecompressionSizeException as e:
+                logger.error('The object is too big after decompression (stopped decompressing at %ib, your configured limit %ib). Ignoring', e.size, config.safeGetInt('zlib', 'maxsize'))
+            except varintDecodeError as e:
+                logger.debug('There was a problem with a varint while processing an object. Some details: %s', e)
+            except Exception:
+                logger.critical('Critical error within objectProcessorThread: \n', exc_info=True)
+            if state.shutdown:
+                time.sleep(0.5)
+                numberOfObjectsThatWereInTheObjectProcessorQueue = 0
+                with SqlBulkExecute() as sql:
+                    while (queues.objectProcessorQueue.curSize > 0):
+                        (objectType, data) = queues.objectProcessorQueue.get()
+                        sql.execute('INSERT INTO objectprocessorqueue VALUES (?,?)', objectType, data)
+                        numberOfObjectsThatWereInTheObjectProcessorQueue += 1
+                logger.debug('Saved %s objects from the objectProcessorQueue to disk. objectProcessorThread exiting.', numberOfObjectsThatWereInTheObjectProcessorQueue)
+                state.shutdown = 2
+                break
+
+    @staticmethod
+    def checkackdata(data):
+        'Checking Acknowledgement of message received or not?'
+        if (len(data) < 32):
+            return
+        readPosition = 16
+        if (data[readPosition:] in state.ackdataForWhichImWatching):
+            logger.info('This object is an acknowledgement bound for me.')
+            del state.ackdataForWhichImWatching[data[readPosition:]]
+            sqlExecute("UPDATE sent SET status='ackreceived', lastactiontime=? WHERE ackdata=?", int(time.time()), data[readPosition:])
+            queues.UISignalQueue.put(('updateSentItemStatusByAckdata', (data[readPosition:], _translate('MainWindow', 'Acknowledgement of the message received %1').arg(l10n.formatTimestamp()))))
+        else:
+            logger.debug('This object is not an acknowledgement bound for me.')
+
+    @staticmethod
+    def processonion(data):
+        'Process onionpeer object'
+        readPosition = 20
+        length = decodeVarint(data[readPosition:(readPosition + 10)])[1]
+        readPosition += length
+        (stream, length) = decodeVarint(data[readPosition:(readPosition + 10)])
+        readPosition += length
+        (port, length) = decodeVarint(data[readPosition:(readPosition + 10)])
+        host = protocol.checkIPAddress(data[(readPosition + length):])
+        if (not host):
+            return
+        peer = Peer(host, port)
+        with knownnodes.knownNodesLock:
+            knownnodes.addKnownNode(stream, peer, is_self=state.ownAddresses.get(peer))
+
+    @staticmethod
+    def processgetpubkey(data):
+        'Process getpubkey object'
+        if (len(data) > 200):
+            return logger.info('getpubkey is abnormally long. Sanity check failed. Ignoring object.')
+        readPosition = 20
+        (requestedAddressVersionNumber, addressVersionLength) = decodeVarint(data[readPosition:(readPosition + 10)])
+        readPosition += addressVersionLength
+        (streamNumber, streamNumberLength) = decodeVarint(data[readPosition:(readPosition + 10)])
+        readPosition += streamNumberLength
+        if (requestedAddressVersionNumber == 0):
+            return logger.debug("The requestedAddressVersionNumber of the pubkey request is zero. That doesn't make any sense. Ignoring it.")
+        if (requestedAddressVersionNumber == 1):
+            return logger.debug("The requestedAddressVersionNumber of the pubkey request is 1 which isn't supported anymore. Ignoring it.")
+        if (requestedAddressVersionNumber > 4):
+            return logger.debug("The requestedAddressVersionNumber of the pubkey request is too high. Can't understand. Ignoring it.")
+        myAddress = ''
+        if (requestedAddressVersionNumber <= 3):
+            requestedHash = data[readPosition:(readPosition + 20)]
+            if (len(requestedHash) != 20):
+                return logger.debug('The length of the requested hash is not 20 bytes. Something is wrong. Ignoring.')
+            logger.info('the hash requested in this getpubkey request is: %s', hexlify(requestedHash))
+            if (requestedHash in shared.myAddressesByHash):
+                myAddress = shared.myAddressesByHash[requestedHash]
+        elif (requestedAddressVersionNumber >= 4):
+            requestedTag = data[readPosition:(readPosition + 32)]
+            if (len(requestedTag) != 32):
+                return logger.debug('The length of the requested tag is not 32 bytes. Something is wrong. Ignoring.')
+            logger.debug('the tag requested in this getpubkey request is: %s', hexlify(requestedTag))
+            if (requestedTag in shared.myAddressesByTag):
+                myAddress = shared.myAddressesByTag[requestedTag]
+        if (myAddress == ''):
+            logger.info('This getpubkey request is not for any of my keys.')
+            return
+        if (decodeAddress(myAddress)[1] != requestedAddressVersionNumber):
+            return logger.warning("(Within the processgetpubkey function) Someone requested one of my pubkeys but the requestedAddressVersionNumber doesn't match my actual address version number. Ignoring.")
+        if (decodeAddress(myAddress)[2] != streamNumber):
+            return logger.warning("(Within the processgetpubkey function) Someone requested one of my pubkeys but the stream number on which we heard this getpubkey object doesn't match this address' stream number. Ignoring.")
+        if config.safeGetBoolean(myAddress, 'chan'):
+            return logger.info('Ignoring getpubkey request because it is for one of my chan addresses. The other party should already have the pubkey.')
+        lastPubkeySendTime = config.safeGetInt(myAddress, 'lastpubkeysendtime')
+        if (lastPubkeySendTime > (time.time() - 2419200)):
+            return logger.info('Found getpubkey-requested-item in my list of EC hashes BUT we already sent it recently. Ignoring request. The lastPubkeySendTime is: %s', lastPubkeySendTime)
+        logger.info('Found getpubkey-requested-hash in my list of EC hashes. Telling Worker thread to do the POW for a pubkey message and send it out.')
+        if (requestedAddressVersionNumber == 2):
+            queues.workerQueue.put(('doPOWForMyV2Pubkey', requestedHash))
+        elif (requestedAddressVersionNumber == 3):
+            queues.workerQueue.put(('sendOutOrStoreMyV3Pubkey', requestedHash))
+        elif (requestedAddressVersionNumber == 4):
+            queues.workerQueue.put(('sendOutOrStoreMyV4Pubkey', myAddress))
+
+    def processpubkey(self, data):
+        'Process a pubkey object'
+        pubkeyProcessingStartTime = time.time()
+        state.numberOfPubkeysProcessed += 1
+        queues.UISignalQueue.put(('updateNumberOfPubkeysProcessed', 'no data'))
+        readPosition = 20
+        (addressVersion, varintLength) = decodeVarint(data[readPosition:(readPosition + 10)])
+        readPosition += varintLength
+        (streamNumber, varintLength) = decodeVarint(data[readPosition:(readPosition + 10)])
+        readPosition += varintLength
+        if (addressVersion == 0):
+            return logger.debug("(Within processpubkey) addressVersion of 0 doesn't make sense.")
+        if ((addressVersion > 4) or (addressVersion == 1)):
+            return logger.info('This version of Bitmessage cannot handle version %s addresses.', addressVersion)
+        if (addressVersion == 2):
+            if (len(data) < 146):
+                return logger.debug('(within processpubkey) payloadLength less than 146. Sanity check failed.')
+            readPosition += 4
+            pubSigningKey = ('\x04' + data[readPosition:(readPosition + 64)])
+            readPosition += 64
+            pubEncryptionKey = ('\x04' + data[readPosition:(readPosition + 64)])
+            if (len(pubEncryptionKey) < 65):
+                return logger.debug('publicEncryptionKey length less than 64. Sanity check failed.')
+            readPosition += 64
+            dataToStore = data[20:readPosition]
+            ripe = highlevelcrypto.to_ripe(pubSigningKey, pubEncryptionKey)
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug('within recpubkey, addressVersion: %s, streamNumber: %s\nripe %s\npublicSigningKey in hex: %s\npublicEncryptionKey in hex: %s', addressVersion, streamNumber, hexlify(ripe), hexlify(pubSigningKey), hexlify(pubEncryptionKey))
+            address = encodeAddress(addressVersion, streamNumber, ripe)
+            queryreturn = sqlQuery("SELECT usedpersonally FROM pubkeys WHERE address=? AND usedpersonally='yes'", address)
+            if (queryreturn != []):
+                logger.info('We HAVE used this pubkey personally. Updating time.')
+                t = (address, addressVersion, dataToStore, int(time.time()), 'yes')
+            else:
+                logger.info('We have NOT used this pubkey personally. Inserting in database.')
+                t = (address, addressVersion, dataToStore, int(time.time()), 'no')
+            sqlExecute('INSERT INTO pubkeys VALUES (?,?,?,?,?)', *t)
+            self.possibleNewPubkey(address)
+        if (addressVersion == 3):
+            if (len(data) < 170):
+                logger.warning('(within processpubkey) payloadLength less than 170. Sanity check failed.')
+                return
+            readPosition += 4
+            pubSigningKey = ('\x04' + data[readPosition:(readPosition + 64)])
+            readPosition += 64
+            pubEncryptionKey = ('\x04' + data[readPosition:(readPosition + 64)])
+            readPosition += 64
+            specifiedNonceTrialsPerByteLength = decodeVarint(data[readPosition:(readPosition + 10)])[1]
+            readPosition += specifiedNonceTrialsPerByteLength
+            specifiedPayloadLengthExtraBytesLength = decodeVarint(data[readPosition:(readPosition + 10)])[1]
+            readPosition += specifiedPayloadLengthExtraBytesLength
+            endOfSignedDataPosition = readPosition
+            dataToStore = data[20:readPosition]
+            (signatureLength, signatureLengthLength) = decodeVarint(data[readPosition:(readPosition + 10)])
+            readPosition += signatureLengthLength
+            signature = data[readPosition:(readPosition + signatureLength)]
+            if highlevelcrypto.verify(data[8:endOfSignedDataPosition], signature, hexlify(pubSigningKey)):
+                logger.debug('ECDSA verify passed (within processpubkey)')
+            else:
+                logger.warning('ECDSA verify failed (within processpubkey)')
+                return
+            ripe = highlevelcrypto.to_ripe(pubSigningKey, pubEncryptionKey)
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug('within recpubkey, addressVersion: %s, streamNumber: %s\nripe %s\npublicSigningKey in hex: %s\npublicEncryptionKey in hex: %s', addressVersion, streamNumber, hexlify(ripe), hexlify(pubSigningKey), hexlify(pubEncryptionKey))
+            address = encodeAddress(addressVersion, streamNumber, ripe)
+            queryreturn = sqlQuery("SELECT usedpersonally FROM pubkeys WHERE address=? AND usedpersonally='yes'", address)
+            if (queryreturn != []):
+                logger.info('We HAVE used this pubkey personally. Updating time.')
+                t = (address, addressVersion, dataToStore, int(time.time()), 'yes')
+            else:
+                logger.info('We have NOT used this pubkey personally. Inserting in database.')
+                t = (address, addressVersion, dataToStore, int(time.time()), 'no')
+            sqlExecute('INSERT INTO pubkeys VALUES (?,?,?,?,?)', *t)
+            self.possibleNewPubkey(address)
+        if (addressVersion == 4):
+            if (len(data) < 350):
+                return logger.debug('(within processpubkey) payloadLength less than 350. Sanity check failed.')
+            tag = data[readPosition:(readPosition + 32)]
+            if (tag not in state.neededPubkeys):
+                return logger.info("We don't need this v4 pubkey. We didn't ask for it.")
+            toAddress = state.neededPubkeys[tag][0]
+            if (protocol.decryptAndCheckPubkeyPayload(data, toAddress) == 'successful'):
+                self.possibleNewPubkey(toAddress)
+        logger.debug('Time required to process this pubkey: %s', (time.time() - pubkeyProcessingStartTime))
+
+    def processmsg(self, data):
+        'Process a message object'
+        messageProcessingStartTime = time.time()
+        state.numberOfMessagesProcessed += 1
+        queues.UISignalQueue.put(('updateNumberOfMessagesProcessed', 'no data'))
+        readPosition = 20
+        (msgVersion, msgVersionLength) = decodeVarint(data[readPosition:(readPosition + 9)])
+        if (msgVersion != 1):
+            return logger.info('Cannot understand message versions other than one. Ignoring message.')
+        readPosition += msgVersionLength
+        (streamNumberAsClaimedByMsg, streamNumberAsClaimedByMsgLength) = decodeVarint(data[readPosition:(readPosition + 9)])
+        readPosition += streamNumberAsClaimedByMsgLength
+        inventoryHash = highlevelcrypto.calculateInventoryHash(data)
+        initialDecryptionSuccessful = False
+        for (key, cryptorObject) in sorted(shared.myECCryptorObjects.items(), key=(lambda x: random.random())):
+            try:
+                if initialDecryptionSuccessful:
+                    cryptorObject.decrypt(data[readPosition:])
+                else:
+                    decryptedData = cryptorObject.decrypt(data[readPosition:])
+                    toRipe = key
+                    initialDecryptionSuccessful = True
+                    logger.info('EC decryption successful using key associated with ripe hash: %s.', hexlify(key))
+            except Exception:
+                pass
+        if (not initialDecryptionSuccessful):
+            return logger.info('Length of time program spent failing to decrypt this message: %s seconds.', (time.time() - messageProcessingStartTime))
+        toAddress = shared.myAddressesByHash[toRipe]
+        readPosition = 0
+        (sendersAddressVersionNumber, sendersAddressVersionNumberLength) = decodeVarint(decryptedData[readPosition:(readPosition + 10)])
+        readPosition += sendersAddressVersionNumberLength
+        if (sendersAddressVersionNumber == 0):
+            return logger.info('Cannot understand sendersAddressVersionNumber = 0. Ignoring message.')
+        if (sendersAddressVersionNumber > 4):
+            return logger.info("Sender's address version number %s not yet supported. Ignoring message.", sendersAddressVersionNumber)
+        if (len(decryptedData) < 170):
+            return logger.info('Length of the unencrypted data is unreasonably short. Sanity check failed. Ignoring message.')
+        (sendersStreamNumber, sendersStreamNumberLength) = decodeVarint(decryptedData[readPosition:(readPosition + 10)])
+        if (sendersStreamNumber == 0):
+            logger.info("sender's stream number is 0. Ignoring message.")
+            return
+        readPosition += sendersStreamNumberLength
+        readPosition += 4
+        pubSigningKey = ('\x04' + decryptedData[readPosition:(readPosition + 64)])
+        readPosition += 64
+        pubEncryptionKey = ('\x04' + decryptedData[readPosition:(readPosition + 64)])
+        readPosition += 64
+        if (sendersAddressVersionNumber >= 3):
+            (requiredAverageProofOfWorkNonceTrialsPerByte, varintLength) = decodeVarint(decryptedData[readPosition:(readPosition + 10)])
+            readPosition += varintLength
+            logger.info("sender's requiredAverageProofOfWorkNonceTrialsPerByte is %s", requiredAverageProofOfWorkNonceTrialsPerByte)
+            (requiredPayloadLengthExtraBytes, varintLength) = decodeVarint(decryptedData[readPosition:(readPosition + 10)])
+            readPosition += varintLength
+            logger.info("sender's requiredPayloadLengthExtraBytes is %s", requiredPayloadLengthExtraBytes)
+        endOfThePublicKeyPosition = readPosition
+        if (toRipe != decryptedData[readPosition:(readPosition + 20)]):
+            return logger.info('The original sender of this message did not send it to you. Someone is attempting a Surreptitious Forwarding Attack.\nSee: http://world.std.com/~dtd/sign_encrypt/sign_encrypt7.html\nyour toRipe: %s\nembedded destination toRipe: %s', hexlify(toRipe), hexlify(decryptedData[readPosition:(readPosition + 20)]))
+        readPosition += 20
+        (messageEncodingType, messageEncodingTypeLength) = decodeVarint(decryptedData[readPosition:(readPosition + 10)])
+        readPosition += messageEncodingTypeLength
+        (messageLength, messageLengthLength) = decodeVarint(decryptedData[readPosition:(readPosition + 10)])
+        readPosition += messageLengthLength
+        message = decryptedData[readPosition:(readPosition + messageLength)]
+        readPosition += messageLength
+        (ackLength, ackLengthLength) = decodeVarint(decryptedData[readPosition:(readPosition + 10)])
+        readPosition += ackLengthLength
+        ackData = decryptedData[readPosition:(readPosition + ackLength)]
+        readPosition += ackLength
+        positionOfBottomOfAckData = readPosition
+        (signatureLength, signatureLengthLength) = decodeVarint(decryptedData[readPosition:(readPosition + 10)])
+        readPosition += signatureLengthLength
+        signature = decryptedData[readPosition:(readPosition + signatureLength)]
+        signedData = (((data[8:20] + encodeVarint(1)) + encodeVarint(streamNumberAsClaimedByMsg)) + decryptedData[:positionOfBottomOfAckData])
+        if (not highlevelcrypto.verify(signedData, signature, hexlify(pubSigningKey))):
+            return logger.debug('ECDSA verify failed')
+        logger.debug('ECDSA verify passed')
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug('As a matter of intellectual curiosity, here is the Bitcoin address associated with the keys owned by the other person: %s  ..and here is the testnet address: %s. The other person must take their private signing key from Bitmessage and import it into Bitcoin (or a service like Blockchain.info) for it to be of any use. Do not use this unless you know what you are doing.', helper_bitcoin.calculateBitcoinAddressFromPubkey(pubSigningKey), helper_bitcoin.calculateTestnetAddressFromPubkey(pubSigningKey))
+        sigHash = highlevelcrypto.double_sha512(signature)[32:]
+        ripe = highlevelcrypto.to_ripe(pubSigningKey, pubEncryptionKey)
+        fromAddress = encodeAddress(sendersAddressVersionNumber, sendersStreamNumber, ripe)
+        sqlExecute('INSERT INTO pubkeys VALUES (?,?,?,?,?)', fromAddress, sendersAddressVersionNumber, decryptedData[:endOfThePublicKeyPosition], int(time.time()), 'yes')
+        self.possibleNewPubkey(fromAddress)
+        if ((decodeAddress(toAddress)[1] >= 3) and (not config.safeGetBoolean(toAddress, 'chan'))):
+            if (not shared.isAddressInMyAddressBookSubscriptionsListOrWhitelist(fromAddress)):
+                requiredNonceTrialsPerByte = config.getint(toAddress, 'noncetrialsperbyte')
+                requiredPayloadLengthExtraBytes = config.getint(toAddress, 'payloadlengthextrabytes')
+                if (not protocol.isProofOfWorkSufficient(data, requiredNonceTrialsPerByte, requiredPayloadLengthExtraBytes)):
+                    return logger.info('Proof of work in msg is insufficient only because it does not meet our higher requirement.')
+        blockMessage = False
+        if (config.get('bitmessagesettings', 'blackwhitelist') == 'black'):
+            queryreturn = sqlQuery("SELECT label FROM blacklist where address=? and enabled='1'", fromAddress)
+            if (queryreturn != []):
+                logger.info('Message ignored because address is in blacklist.')
+                blockMessage = True
+        else:
+            queryreturn = sqlQuery("SELECT label FROM whitelist where address=? and enabled='1'", fromAddress)
+            if (queryreturn == []):
+                logger.info('Message ignored because address not in whitelist.')
+                blockMessage = True
+        try:
+            decodedMessage = helper_msgcoding.MsgDecode(messageEncodingType, message)
+        except helper_msgcoding.MsgDecodeException:
+            return
+        subject = decodedMessage.subject
+        body = decodedMessage.body
+        if helper_inbox.isMessageAlreadyInInbox(sigHash):
+            logger.info('This msg is already in our inbox. Ignoring it.')
+            blockMessage = True
+        if (not blockMessage):
+            if (messageEncodingType != 0):
+                t = (inventoryHash, toAddress, fromAddress, subject, int(time.time()), body, 'inbox', messageEncodingType, 0, sigHash)
+                helper_inbox.insert(t)
+                queues.UISignalQueue.put(('displayNewInboxMessage', (inventoryHash, toAddress, fromAddress, subject, body)))
+            if config.safeGetBoolean('bitmessagesettings', 'apienabled'):
+                apiNotifyPath = config.safeGet('bitmessagesettings', 'apinotifypath')
+                if apiNotifyPath:
+                    subprocess.call([apiNotifyPath, 'newMessage'])
+            if (config.safeGetBoolean(toAddress, 'mailinglist') and (messageEncodingType != 0)):
+                mailingListName = config.safeGet(toAddress, 'mailinglistname', '')
+                subject = self.addMailingListNameToSubject(subject, mailingListName)
+                message = ((((time.strftime('%a, %Y-%m-%d %H:%M:%S UTC', time.gmtime()) + '   Message ostensibly from ') + fromAddress) + ':\n\n') + body)
+                fromAddress = toAddress
+                toAddress = '[Broadcast subscribers]'
+                ackdata = helper_sent.insert(fromAddress=fromAddress, status='broadcastqueued', subject=subject, message=message, encoding=messageEncodingType)
+                queues.UISignalQueue.put(('displayNewSentMessage', (toAddress, '[Broadcast subscribers]', fromAddress, subject, message, ackdata)))
+                queues.workerQueue.put(('sendbroadcast', ''))
+        if (self.ackDataHasAValidHeader(ackData) and (not blockMessage) and (messageEncodingType != 0) and (not config.safeGetBoolean(toAddress, 'dontsendack')) and (not config.safeGetBoolean(toAddress, 'chan'))):
+            ackPayload = ackData[24:]
+            (objectType, toStreamNumber, expiresTime) = protocol.decodeObjectParameters(ackPayload)
+            inventoryHash = highlevelcrypto.calculateInventoryHash(ackPayload)
+            state.Inventory[inventoryHash] = (objectType, toStreamNumber, ackPayload, expiresTime, b'')
+            queues.invQueue.put((toStreamNumber, inventoryHash))
+        timeRequiredToAttemptToDecryptMessage = (time.time() - messageProcessingStartTime)
+        self.successfullyDecryptMessageTimings.append(timeRequiredToAttemptToDecryptMessage)
+        timing_sum = 0
+        for item in self.successfullyDecryptMessageTimings:
+            timing_sum += item
+        logger.debug('Time to decrypt this message successfully: %s\nAverage time for all message decryption successes since startup: %s.', timeRequiredToAttemptToDecryptMessage, (timing_sum / len(self.successfullyDecryptMessageTimings)))
+
+    def processbroadcast(self, data):
+        'Process a broadcast object'
+        messageProcessingStartTime = time.time()
+        state.numberOfBroadcastsProcessed += 1
+        queues.UISignalQueue.put(('updateNumberOfBroadcastsProcessed', 'no data'))
+        inventoryHash = highlevelcrypto.calculateInventoryHash(data)
+        readPosition = 20
+        (broadcastVersion, broadcastVersionLength) = decodeVarint(data[readPosition:(readPosition + 9)])
+        readPosition += broadcastVersionLength
+        if ((broadcastVersion < 4) or (broadcastVersion > 5)):
+            return logger.info("Cannot decode incoming broadcast versions less than 4 or higher than 5. Assuming the sender isn't being silly, you should upgrade Bitmessage because this message shall be ignored.")
+        (cleartextStreamNumber, cleartextStreamNumberLength) = decodeVarint(data[readPosition:(readPosition + 10)])
+        readPosition += cleartextStreamNumberLength
+        if (broadcastVersion == 4):
+            signedData = data[8:readPosition]
+            initialDecryptionSuccessful = False
+            for (key, cryptorObject) in sorted(shared.MyECSubscriptionCryptorObjects.items(), key=(lambda x: random.random())):
+                try:
+                    if initialDecryptionSuccessful:
+                        cryptorObject.decrypt(data[readPosition:])
+                    else:
+                        decryptedData = cryptorObject.decrypt(data[readPosition:])
+                        toRipe = key
+                        initialDecryptionSuccessful = True
+                        logger.info('EC decryption successful using key associated with ripe hash: %s', hexlify(key))
+                except Exception:
+                    logger.debug('cryptorObject.decrypt Exception:', exc_info=True)
+            if (not initialDecryptionSuccessful):
+                return logger.debug('Length of time program spent failing to decrypt this v4 broadcast: %s seconds.', (time.time() - messageProcessingStartTime))
+        elif (broadcastVersion == 5):
+            embeddedTag = data[readPosition:(readPosition + 32)]
+            readPosition += 32
+            if (embeddedTag not in shared.MyECSubscriptionCryptorObjects):
+                logger.debug("We're not interested in this broadcast.")
+                return
+            signedData = data[8:readPosition]
+            cryptorObject = shared.MyECSubscriptionCryptorObjects[embeddedTag]
+            try:
+                decryptedData = cryptorObject.decrypt(data[readPosition:])
+                logger.debug('EC decryption successful')
+            except Exception:
+                return logger.debug('Broadcast version %s decryption Unsuccessful.', broadcastVersion)
+        readPosition = 0
+        (sendersAddressVersion, sendersAddressVersionLength) = decodeVarint(decryptedData[readPosition:(readPosition + 9)])
+        if (broadcastVersion == 4):
+            if ((sendersAddressVersion < 2) or (sendersAddressVersion > 3)):
+                return logger.warning("Cannot decode senderAddressVersion other than 2 or 3. Assuming the sender isn't being silly, you should upgrade Bitmessage because this message shall be ignored.")
+        elif (broadcastVersion == 5):
+            if (sendersAddressVersion < 4):
+                return logger.info("Cannot decode senderAddressVersion less than 4 for broadcast version number 5. Assuming the sender isn't being silly, you should upgrade Bitmessage because this message shall be ignored.")
+        readPosition += sendersAddressVersionLength
+        (sendersStream, sendersStreamLength) = decodeVarint(decryptedData[readPosition:(readPosition + 9)])
+        if (sendersStream != cleartextStreamNumber):
+            return logger.info("The stream number outside of the encryption on which the POW was completed doesn't match the stream number inside the encryption. Ignoring broadcast.")
+        readPosition += sendersStreamLength
+        readPosition += 4
+        sendersPubSigningKey = ('\x04' + decryptedData[readPosition:(readPosition + 64)])
+        readPosition += 64
+        sendersPubEncryptionKey = ('\x04' + decryptedData[readPosition:(readPosition + 64)])
+        readPosition += 64
+        if (sendersAddressVersion >= 3):
+            (requiredAverageProofOfWorkNonceTrialsPerByte, varintLength) = decodeVarint(decryptedData[readPosition:(readPosition + 10)])
+            readPosition += varintLength
+            logger.debug("sender's requiredAverageProofOfWorkNonceTrialsPerByte is %s", requiredAverageProofOfWorkNonceTrialsPerByte)
+            (requiredPayloadLengthExtraBytes, varintLength) = decodeVarint(decryptedData[readPosition:(readPosition + 10)])
+            readPosition += varintLength
+            logger.debug("sender's requiredPayloadLengthExtraBytes is %s", requiredPayloadLengthExtraBytes)
+        endOfPubkeyPosition = readPosition
+        calculatedRipe = highlevelcrypto.to_ripe(sendersPubSigningKey, sendersPubEncryptionKey)
+        if (broadcastVersion == 4):
+            if (toRipe != calculatedRipe):
+                return logger.info("The encryption key used to encrypt this message doesn't match the keys inbedded in the message itself. Ignoring message.")
+        elif (broadcastVersion == 5):
+            calculatedTag = highlevelcrypto.double_sha512(((encodeVarint(sendersAddressVersion) + encodeVarint(sendersStream)) + calculatedRipe))[32:]
+            if (calculatedTag != embeddedTag):
+                return logger.debug("The tag and encryption key used to encrypt this message doesn't match the keys inbedded in the message itself. Ignoring message.")
+        (messageEncodingType, messageEncodingTypeLength) = decodeVarint(decryptedData[readPosition:(readPosition + 9)])
+        if (messageEncodingType == 0):
+            return
+        readPosition += messageEncodingTypeLength
+        (messageLength, messageLengthLength) = decodeVarint(decryptedData[readPosition:(readPosition + 9)])
+        readPosition += messageLengthLength
+        message = decryptedData[readPosition:(readPosition + messageLength)]
+        readPosition += messageLength
+        readPositionAtBottomOfMessage = readPosition
+        (signatureLength, signatureLengthLength) = decodeVarint(decryptedData[readPosition:(readPosition + 9)])
+        readPosition += signatureLengthLength
+        signature = decryptedData[readPosition:(readPosition + signatureLength)]
+        signedData += decryptedData[:readPositionAtBottomOfMessage]
+        if (not highlevelcrypto.verify(signedData, signature, hexlify(sendersPubSigningKey))):
+            logger.debug('ECDSA verify failed')
+            return
+        logger.debug('ECDSA verify passed')
+        sigHash = highlevelcrypto.double_sha512(signature)[32:]
+        fromAddress = encodeAddress(sendersAddressVersion, sendersStream, calculatedRipe)
+        logger.info('fromAddress: %s', fromAddress)
+        sqlExecute('INSERT INTO pubkeys VALUES (?,?,?,?,?)', fromAddress, sendersAddressVersion, decryptedData[:endOfPubkeyPosition], int(time.time()), 'yes')
+        self.possibleNewPubkey(fromAddress)
+        try:
+            decodedMessage = helper_msgcoding.MsgDecode(messageEncodingType, message)
+        except helper_msgcoding.MsgDecodeException:
+            return
+        subject = decodedMessage.subject
+        body = decodedMessage.body
+        toAddress = '[Broadcast subscribers]'
+        if helper_inbox.isMessageAlreadyInInbox(sigHash):
+            logger.info('This broadcast is already in our inbox. Ignoring it.')
+            return
+        t = (inventoryHash, toAddress, fromAddress, subject, int(time.time()), body, 'inbox', messageEncodingType, 0, sigHash)
+        helper_inbox.insert(t)
+        queues.UISignalQueue.put(('displayNewInboxMessage', (inventoryHash, toAddress, fromAddress, subject, body)))
+        if config.safeGetBoolean('bitmessagesettings', 'apienabled'):
+            apiNotifyPath = config.safeGet('bitmessagesettings', 'apinotifypath')
+            if apiNotifyPath:
+                subprocess.call([apiNotifyPath, 'newBroadcast'])
+        logger.info('Time spent processing this interesting broadcast: %s', (time.time() - messageProcessingStartTime))
+
+    def possibleNewPubkey(self, address):
+        "\n        We have inserted a pubkey into our pubkey table which we received\n        from a pubkey, msg, or broadcast message. It might be one that we\n        have been waiting for. Let's check.\n        "
+        (addressVersion, streamNumber, ripe) = decodeAddress(address)[1:]
+        if (addressVersion <= 3):
+            if (address in state.neededPubkeys):
+                del state.neededPubkeys[address]
+                self.sendMessages(address)
+            else:
+                logger.debug("We don't need this pub key. We didn't ask for it. For address: %s", address)
+        elif (addressVersion >= 4):
+            tag = highlevelcrypto.double_sha512(((encodeVarint(addressVersion) + encodeVarint(streamNumber)) + ripe))[32:]
+            if (tag in state.neededPubkeys):
+                del state.neededPubkeys[tag]
+                self.sendMessages(address)
+
+    @staticmethod
+    def sendMessages(address):
+        '\n        This method is called by the `possibleNewPubkey` when it sees\n        that we now have the necessary pubkey to send one or more messages.\n        '
+        logger.info('We have been awaiting the arrival of this pubkey.')
+        sqlExecute("UPDATE sent SET status='doingmsgpow', retrynumber=0 WHERE toaddress=? AND (status='awaitingpubkey' OR status='doingpubkeypow') AND folder='sent'", address)
+        queues.workerQueue.put(('sendmessage', ''))
+
+    @staticmethod
+    def ackDataHasAValidHeader(ackData):
+        'Checking ackData with valid Header, not sending ackData when false'
+        if (len(ackData) < protocol.Header.size):
+            logger.info('The length of ackData is unreasonably short. Not sending ackData.')
+            return False
+        (magic, command, payloadLength, checksum) = protocol.Header.unpack(ackData[:protocol.Header.size])
+        if (magic != protocol.magic):
+            logger.info('Ackdata magic bytes were wrong. Not sending ackData.')
+            return False
+        payload = ackData[protocol.Header.size:]
+        if (len(payload) != payloadLength):
+            logger.info("ackData payload length doesn't match the payload length specified in the header. Not sending ackdata.")
+            return False
+        if (payloadLength > 1600100):
+            return False
+        if (checksum != hashlib.sha512(payload).digest()[0:4]):
+            logger.info('ackdata checksum wrong. Not sending ackdata.')
+            return False
+        command = command.rstrip('\x00')
+        if (command != 'object'):
+            return False
+        return True
+
+    @staticmethod
+    def addMailingListNameToSubject(subject, mailingListName):
+        'Adding mailingListName to subject'
+        subject = subject.strip()
+        if ((subject[:3] == 'Re:') or (subject[:3] == 'RE:')):
+            subject = subject[3:].strip()
+        if ((('[' + mailingListName) + ']') in subject):
+            return subject
+        return ((('[' + mailingListName) + '] ') + subject)
+
+op2->op4
+op4->op6
+op6->op8
+op8->op10
+op10->op12
+op12->op14
+op14->op16
+op16->op18
+op18->op20
+op20->op22
+op22->op24
+op24->op26
+op26->op28
+op28->op30
+op30->op32
+op32->op34
+op34->op36
+op36->op38
+op38->op40
+op40->op42
+op42->op44
+op44->op46
+op46->op48
+op48->op50
+op50->op52
+op52->op54
+</textarea></div>
+        <div><button id="run" type="button">Run</button> <button onclick="HelpText()">Format Help</button></div>
+        <div id="HelpTextBlock" style="display:none"><br/>Conditions can also be redirected like cond(yes, bottom) or cond(yes, right)
+... and the other symbols too... like sub1(right)<br/>
+You can also tweak the <b>diagram.drawSVG('diagram', {});</b> script in this file for more changes<br/>
+This is based on <a href="https://github.com/adrai/flowchart.js">flowchart.js on github</a> and <a href="http://flowchart.js.org">http://flowchart.js.org</a> more documentation can be found over there.
+</div><br/><div id="svgbase64"></div>
+        <div id="pngbase64"></div>
+
+        <div id="canvas"></div>
+    </body>
+</html>

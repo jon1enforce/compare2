@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <title>class_sqlThread.html</title>
+        <style type="text/css">
+          .end-element { fill : #FFCCFF; }
+        </style>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/raphael/2.3.0/raphael.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/flowchart/1.17.1/flowchart.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.1/js/bootstrap.bundle.min.js"></script>
+        <!-- <script src="../release/flowchart.min.js"></script> -->
+        <script>
+
+            window.onload = function () {
+                var btn = document.getElementById("run"),
+                    cd = document.getElementById("code"),
+                    chart;
+                    
+                (btn.onclick = function () {
+                    var code = cd.value;
+
+                    if (chart) {
+                      chart.clean();
+                    }
+
+                    chart = flowchart.parse(code);
+                    chart.drawSVG('canvas', {
+                      'x': 0,
+                      'y': 0,
+                      'line-width': 3,
+                      //'maxWidth': 15,//ensures the flowcharts fits within a certain width
+                      'line-length': 50,
+                      'text-margin': 10,
+                      'font-size': 14,
+                      'font': 'normal',
+                      'font-family': 'Helvetica',
+                      'font-weight': 'normal',
+                      'font-color': 'black',
+                      'line-color': 'black',
+                      'element-color': 'black',
+                      'fill': 'white',
+                      'yes-text': 'yes',
+                      'no-text': 'no',
+                      'arrow-end': 'block',
+                      'scale': 1,
+                      'symbols': {
+                        'start': {
+                          'font-size': 14,
+                          'font-color': 'yellow',
+                          'element-color': 'blue',
+                          'fill': 'green',
+                          'class': 'start-element'
+                        },
+                        'inputoutput': {
+                          'font-color': 'black',
+                          'element-color': 'black',
+                          'fill': 'bisque'
+                        },
+                        'operation': {
+                          'font-color': 'black',
+                          'element-color': 'black',
+                          'fill': 'linen'
+                        },
+                        'subroutine': {
+                          'font-color': 'black',
+                          'element-color': 'blue',
+                          'fill': 'lightgreen'
+                        },
+                        'condition': {
+                          'font-color': 'red',
+                          'element-color': 'black',
+                          'fill': 'yellow'
+                        },
+                        'end':{
+                          'font-size': 20,
+                          'class': 'end-element'
+                        }
+                      },
+                      'flowstate' : {
+                        //'past' : { 'fill' : '#CCCCCC', 'font-size' : 12},
+                        //'current' : {'fill' : 'yellow', 'font-color' : 'red', 'font-weight' : 'bold'},
+                        //'future' : { 'fill' : '#FFFF99'},
+                        'request' : { 'fill' : 'blue'},
+                        'invalid': {'fill' : '#444444'},
+                        'approved' : { 'fill' : '#58C4A3', 'font-size' : 12, 'yes-text' : 'APPROVED', 'no-text' : 'n/a' },
+                        'rejected' : { 'fill' : '#C45879', 'font-size' : 12, 'yes-text' : 'n/a', 'no-text' : 'REJECTED' }
+                      }
+                    });
+                    //create base64 encoding of SVG to generate download link for title(without html or htm).SVG
+                    var currentCanvasDIV = document.getElementById('canvas')
+                    var currentDrawSVG = currentCanvasDIV.innerHTML.replaceAll('ë','e');
+
+                    const OUTsvgBASE64 = btoa(currentDrawSVG)
+                    doctitle = document.title.replace('.html','');
+                    doctitle = doctitle.replace('.htm','');
+
+
+                    var currentCanvasDIV = document.getElementById('canvas')
+                    var currentDrawSVG = currentCanvasDIV.innerHTML.replaceAll('ë','e');
+                    svgSource = currentDrawSVG
+                    svgXML = currentDrawSVG;
+                    // Use SVG Height and Width from the SVG XML to set canvas size
+                    svgXMLsubstringHeight = svgXML.substring(svgXML.indexOf('height='), svgXML.indexOf('version='));
+                    svgXMLsubstringWidth = svgXML.substring(svgXML.indexOf('width='), svgXML.indexOf('xmlns='));
+                    HeightValue = svgXMLsubstringHeight.substring(svgXMLsubstringHeight.indexOf('"')+1,svgXMLsubstringHeight.lastIndexOf('"'));
+                    WidthValue = svgXMLsubstringWidth.substring(svgXMLsubstringWidth.indexOf('"')+1,svgXMLsubstringWidth.lastIndexOf('"'));
+                    HeightValueInt = Math.round(HeightValue)
+                    WidthValueInt = Math.round(WidthValue)
+                    // setup input for base64SvgToBase64Png
+                    let svgSrc = "data:image/svg+xml;base64,"+OUTsvgBASE64;
+                    var pngBase
+                    imageUtil.base64SvgToBase64Png(svgSrc, WidthValueInt, HeightValueInt).then(pngSrc => {
+                    pngBase = pngSrc
+                    // output download link for base64 PNG converted on download from base64
+                    var pngOutHtml = `<a href="${pngBase}" download="${doctitle}.png">PNG - Click here to download current rendered flowchart as ${doctitle}.png</a>`
+                    document.getElementById("pngbase64").innerHTML=pngOutHtml;
+                    });    
+                    // output download link for base64 SVG converted on download from base64
+                    var svgOutHtml = `<a href="data:image/svg+xml;base64,${OUTsvgBASE64}" download=${doctitle}.svg>SVG - Click here to download current rendered flowchart as ${doctitle}.svg</a> `
+                        document.getElementById("svgbase64").innerHTML=svgOutHtml;
+                    })();
+
+                            };
+                 
+
+// derived from https://stackoverflow.com/a/64800570
+// we need to use web browser canvas to generate a image. In this case png
+let imageUtil = {};
+/**
+ * converts a base64 encoded data url SVG image to a PNG image
+ * @param originalBase64 data url of svg image
+ * @param width target width in pixel of PNG image
+ * @param secondTry used internally to prevent endless recursion
+ * @return {Promise<unknown>} resolves to png data url of the image
+ */
+imageUtil.base64SvgToBase64Png = function (originalBase64, width, height, secondTry) {
+    return new Promise(resolve => {
+        let img = document.createElement('img');
+        img.onload = function () {
+            if (!secondTry && (img.naturalWidth === 0 || img.naturalHeight === 0)) {
+                let svgDoc = base64ToSvgDocument(originalBase64);
+                let fixedDoc = fixSvgDocumentFF(svgDoc);
+                return imageUtil.base64SvgToBase64Png(svgDocumentToBase64(fixedDoc), width, height, true).then(result => {
+                    resolve(result);
+                });
+            }
+            //document.body.appendChild(img);
+            let canvas2 = document.createElement("canvas");
+            //document.body.removeChild(img);
+            canvas2.width = width;
+            canvas2.height = height;
+            let ctx = canvas2.getContext("2d");
+            ctx.drawImage(img, 0, 0, canvas2.width, canvas2.height);
+            try {
+                let data = canvas2.toDataURL('image/png');
+                resolve(data);
+            } catch (e) {
+                resolve(null);
+            }
+        };
+        img.src = originalBase64;
+    });
+}
+
+//needed because Firefox doesn't correctly handle SVG with size = 0, see https://bugzilla.mozilla.org/show_bug.cgi?id=700533
+function fixSvgDocumentFF(svgDocument) {
+    try {
+        let widthInt = parseInt(svgDocument.documentElement.width.baseVal.value) || 500;
+        let heightInt = parseInt(svgDocument.documentElement.height.baseVal.value) || 500;
+        svgDocument.documentElement.width.baseVal.newValueSpecifiedUnits(SVGLength.SVG_LENGTHTYPE_PX, widthInt);
+        svgDocument.documentElement.height.baseVal.newValueSpecifiedUnits(SVGLength.SVG_LENGTHTYPE_PX, heightInt);
+        return svgDocument;
+    } catch (e) {
+        return svgDocument;
+    }
+}
+
+function svgDocumentToBase64(svgDocument) {
+    try {
+        let base64EncodedSVG = btoa(new XMLSerializer().serializeToString(svgDocument));
+        return 'data:image/svg+xml;base64,' + base64EncodedSVG;
+    } catch (e) {
+        return null;
+    }
+}
+
+function base64ToSvgDocument(base64) {
+    let svg = atob(base64.substring(base64.indexOf('base64,') + 7));
+    svg = svg.substring(svg.indexOf('<svg'));
+    let parser = new DOMParser();
+    return parser.parseFromString(svg, "image/svg+xml");
+} 
+        </script>
+
+        <script>
+            function HelpText() {
+              var x = document.getElementById("HelpTextBlock");
+              if (x.style.display === "none") {
+                x.style.display = "block";
+              } else {
+                x.style.display = "none";
+              }
+            }
+        </script>
+    </head>
+    <body>
+        <div><textarea id="code" style="width: 100%;" rows="11">op2=>operation: '\nsqlThread is defined here\n'
+op4=>operation: import os
+op6=>operation: import shutil
+op8=>operation: import sqlite3
+op10=>operation: import sys
+op12=>operation: import threading
+op14=>operation: import time
+op16=>operation: try:
+    import helper_sql
+    import helper_startup
+    import paths
+    import queues
+    import state
+    from addresses import encodeAddress
+    from bmconfigparser import config, config_ready
+    from debug import logger
+    from tr import _translate
+except ImportError:
+    from . import helper_sql, helper_startup, paths, queues, state
+    from .addresses import encodeAddress
+    from .bmconfigparser import config, config_ready
+    from .debug import logger
+    from .tr import _translate
+op18=>operation: class sqlThread(threading.Thread):
+    'A thread for all SQL operations'
+
+    def __init__(self):
+        threading.Thread.__init__(self, name='SQL')
+
+    def run(self):
+        'Process SQL queries from `.helper_sql.sqlSubmitQueue`'
+        helper_sql.sql_available = True
+        config_ready.wait()
+        self.conn = sqlite3.connect((state.appdata + 'messages.dat'))
+        self.conn.text_factory = str
+        self.cur = self.conn.cursor()
+        self.cur.execute('PRAGMA secure_delete = true')
+        self.create_function()
+        try:
+            self.cur.execute('CREATE TABLE inbox (msgid blob, toaddress text, fromaddress text, subject text, received text, message text, folder text, encodingtype int, read bool, sighash blob, UNIQUE(msgid) ON CONFLICT REPLACE)')
+            self.cur.execute('CREATE TABLE sent (msgid blob, toaddress text, toripe blob, fromaddress text, subject text, message text, ackdata blob, senttime integer, lastactiontime integer, sleeptill integer, status text, retrynumber integer, folder text, encodingtype int, ttl int)')
+            self.cur.execute('CREATE TABLE subscriptions (label text, address text, enabled bool)')
+            self.cur.execute('CREATE TABLE addressbook (label text, address text, UNIQUE(address) ON CONFLICT IGNORE)')
+            self.cur.execute('CREATE TABLE blacklist (label text, address text, enabled bool)')
+            self.cur.execute('CREATE TABLE whitelist (label text, address text, enabled bool)')
+            self.cur.execute('CREATE TABLE pubkeys (address text, addressversion int, transmitdata blob, time int, usedpersonally text, UNIQUE(address) ON CONFLICT REPLACE)')
+            self.cur.execute('CREATE TABLE inventory (hash blob, objecttype int, streamnumber int, payload blob, expirestime integer, tag blob, UNIQUE(hash) ON CONFLICT REPLACE)')
+            self.cur.execute("INSERT INTO subscriptions VALUES('Bitmessage new releases/announcements','BM-GtovgYdgs7qXPkoYaRgrLFuFKz1SFpsw',1)")
+            self.cur.execute('CREATE TABLE settings (key blob, value blob, UNIQUE(key) ON CONFLICT REPLACE)')
+            self.cur.execute("INSERT INTO settings VALUES('version','11')")
+            self.cur.execute("INSERT INTO settings VALUES('lastvacuumtime',?)", (int(time.time()),))
+            self.cur.execute('CREATE TABLE objectprocessorqueue (objecttype int, data blob, UNIQUE(objecttype, data) ON CONFLICT REPLACE)')
+            self.conn.commit()
+            logger.info('Created messages database file')
+        except Exception as err:
+            if (str(err) == 'table inbox already exists'):
+                logger.debug('Database file already exists.')
+            else:
+                sys.stderr.write(('ERROR trying to create database file (message.dat). Error message: %s\n' % str(err)))
+                os._exit(0)
+        settingsversion = config.getint('bitmessagesettings', 'settingsversion')
+        if (settingsversion == 2):
+            item = "ALTER TABLE pubkeys ADD usedpersonally text DEFAULT 'no' "
+            parameters = ''
+            self.cur.execute(item, parameters)
+            self.conn.commit()
+            settingsversion = 3
+        if (settingsversion == 3):
+            item = "ALTER TABLE inbox ADD encodingtype int DEFAULT '2' "
+            parameters = ''
+            self.cur.execute(item, parameters)
+            item = "ALTER TABLE inbox ADD read bool DEFAULT '1' "
+            parameters = ''
+            self.cur.execute(item, parameters)
+            item = "ALTER TABLE sent ADD encodingtype int DEFAULT '2' "
+            parameters = ''
+            self.cur.execute(item, parameters)
+            self.conn.commit()
+            settingsversion = 4
+        config.set('bitmessagesettings', 'settingsversion', str(settingsversion))
+        config.save()
+        helper_startup.updateConfig()
+        item = "SELECT name FROM sqlite_master WHERE type='table' AND name='settings';"
+        parameters = ''
+        self.cur.execute(item, parameters)
+        if (self.cur.fetchall() == []):
+            logger.debug("In messages.dat database, creating new 'settings' table.")
+            self.cur.execute('CREATE TABLE settings (key text, value blob, UNIQUE(key) ON CONFLICT REPLACE)')
+            self.cur.execute("INSERT INTO settings VALUES('version','1')")
+            self.cur.execute("INSERT INTO settings VALUES('lastvacuumtime',?)", (int(time.time()),))
+            logger.debug('In messages.dat database, removing an obsolete field from the pubkeys table.')
+            self.cur.execute('CREATE TEMPORARY TABLE pubkeys_backup(hash blob, transmitdata blob, time int, usedpersonally text, UNIQUE(hash) ON CONFLICT REPLACE);')
+            self.cur.execute('INSERT INTO pubkeys_backup SELECT hash, transmitdata, time, usedpersonally FROM pubkeys;')
+            self.cur.execute('DROP TABLE pubkeys')
+            self.cur.execute('CREATE TABLE pubkeys (hash blob, transmitdata blob, time int, usedpersonally text, UNIQUE(hash) ON CONFLICT REPLACE)')
+            self.cur.execute('INSERT INTO pubkeys SELECT hash, transmitdata, time, usedpersonally FROM pubkeys_backup;')
+            self.cur.execute('DROP TABLE pubkeys_backup;')
+            logger.debug('Deleting all pubkeys from inventory. They will be redownloaded and then saved with the correct times.')
+            self.cur.execute("delete from inventory where objecttype = 'pubkey';")
+            logger.debug('replacing Bitmessage announcements mailing list with a new one.')
+            self.cur.execute("delete from subscriptions where address='BM-BbkPSZbzPwpVcYZpU4yHwf9ZPEapN5Zx' ")
+            self.cur.execute("INSERT INTO subscriptions VALUES('Bitmessage new releases/announcements','BM-GtovgYdgs7qXPkoYaRgrLFuFKz1SFpsw',1)")
+            logger.debug('Commiting.')
+            self.conn.commit()
+            logger.debug('Vacuuming message.dat. You might notice that the file size gets much smaller.')
+            self.cur.execute(' VACUUM ')
+        self.cur.execute("update sent set status='doingmsgpow' where status='doingpow'  ")
+        self.cur.execute("update sent set status='msgsent' where status='sentmessage'  ")
+        self.cur.execute("update sent set status='doingpubkeypow' where status='findingpubkey'  ")
+        self.cur.execute("update sent set status='broadcastqueued' where status='broadcastpending'  ")
+        self.conn.commit()
+        item = "SELECT value FROM settings WHERE key='version';"
+        parameters = ''
+        self.cur.execute(item, parameters)
+        if (int(self.cur.fetchall()[0][0]) == 2):
+            logger.debug('In messages.dat database, removing an obsolete field from the inventory table.')
+            self.cur.execute('CREATE TEMPORARY TABLE inventory_backup(hash blob, objecttype text, streamnumber int, payload blob, receivedtime integer, UNIQUE(hash) ON CONFLICT REPLACE);')
+            self.cur.execute('INSERT INTO inventory_backup SELECT hash, objecttype, streamnumber, payload, receivedtime FROM inventory;')
+            self.cur.execute('DROP TABLE inventory')
+            self.cur.execute('CREATE TABLE inventory (hash blob, objecttype text, streamnumber int, payload blob, receivedtime integer, UNIQUE(hash) ON CONFLICT REPLACE)')
+            self.cur.execute('INSERT INTO inventory SELECT hash, objecttype, streamnumber, payload, receivedtime FROM inventory_backup;')
+            self.cur.execute('DROP TABLE inventory_backup;')
+            item = "update settings set value=? WHERE key='version';"
+            parameters = (3,)
+            self.cur.execute(item, parameters)
+        item = "SELECT value FROM settings WHERE key='version';"
+        parameters = ''
+        self.cur.execute(item, parameters)
+        currentVersion = int(self.cur.fetchall()[0][0])
+        if ((currentVersion == 1) or (currentVersion == 3)):
+            logger.debug('In messages.dat database, adding tag field to the inventory table.')
+            item = "ALTER TABLE inventory ADD tag blob DEFAULT '' "
+            parameters = ''
+            self.cur.execute(item, parameters)
+            item = "update settings set value=? WHERE key='version';"
+            parameters = (4,)
+            self.cur.execute(item, parameters)
+        item = "SELECT value FROM settings WHERE key='version';"
+        parameters = ''
+        self.cur.execute(item, parameters)
+        currentVersion = int(self.cur.fetchall()[0][0])
+        if (currentVersion == 4):
+            self.cur.execute('DROP TABLE pubkeys')
+            self.cur.execute('CREATE TABLE pubkeys (hash blob, addressversion int, transmitdata blob, time int,usedpersonally text, UNIQUE(hash, addressversion) ON CONFLICT REPLACE)')
+            self.cur.execute("delete from inventory where objecttype = 'pubkey';")
+            item = "update settings set value=? WHERE key='version';"
+            parameters = (5,)
+            self.cur.execute(item, parameters)
+        item = "SELECT value FROM settings WHERE key='version';"
+        parameters = ''
+        self.cur.execute(item, parameters)
+        currentVersion = int(self.cur.fetchall()[0][0])
+        if (currentVersion == 5):
+            self.cur.execute('DROP TABLE knownnodes')
+            self.cur.execute('CREATE TABLE objectprocessorqueue (objecttype text, data blob, UNIQUE(objecttype, data) ON CONFLICT REPLACE)')
+            item = "update settings set value=? WHERE key='version';"
+            parameters = (6,)
+            self.cur.execute(item, parameters)
+        item = "SELECT value FROM settings WHERE key='version';"
+        parameters = ''
+        self.cur.execute(item, parameters)
+        currentVersion = int(self.cur.fetchall()[0][0])
+        if (currentVersion == 6):
+            logger.debug('In messages.dat database, dropping and recreating the inventory table.')
+            self.cur.execute('DROP TABLE inventory')
+            self.cur.execute('CREATE TABLE inventory (hash blob, objecttype int, streamnumber int, payload blob, expirestime integer, tag blob, UNIQUE(hash) ON CONFLICT REPLACE)')
+            self.cur.execute('DROP TABLE objectprocessorqueue')
+            self.cur.execute('CREATE TABLE objectprocessorqueue (objecttype int, data blob, UNIQUE(objecttype, data) ON CONFLICT REPLACE)')
+            item = "update settings set value=? WHERE key='version';"
+            parameters = (7,)
+            self.cur.execute(item, parameters)
+            logger.debug('Finished dropping and recreating the inventory table.')
+        item = "SELECT value FROM settings WHERE key='version';"
+        parameters = ''
+        self.cur.execute(item, parameters)
+        currentVersion = int(self.cur.fetchall()[0][0])
+        if (currentVersion == 7):
+            logger.debug('In messages.dat database, clearing pubkeys table because the data format has been updated.')
+            self.cur.execute('delete from inventory where objecttype = 1;')
+            self.cur.execute('delete from pubkeys;')
+            self.cur.execute("UPDATE sent SET status='msgqueued' WHERE status='doingmsgpow' or status='badkey';")
+            query = "update settings set value=? WHERE key='version';"
+            parameters = (8,)
+            self.cur.execute(query, parameters)
+            logger.debug('Finished clearing currently held pubkeys.')
+        item = "SELECT value FROM settings WHERE key='version';"
+        parameters = ''
+        self.cur.execute(item, parameters)
+        currentVersion = int(self.cur.fetchall()[0][0])
+        if (currentVersion == 8):
+            logger.debug('In messages.dat database, adding sighash field to the inbox table.')
+            item = "ALTER TABLE inbox ADD sighash blob DEFAULT '' "
+            parameters = ''
+            self.cur.execute(item, parameters)
+            item = "update settings set value=? WHERE key='version';"
+            parameters = (9,)
+            self.cur.execute(item, parameters)
+        item = "SELECT value FROM settings WHERE key='version';"
+        parameters = ''
+        self.cur.execute(item, parameters)
+        currentVersion = int(self.cur.fetchall()[0][0])
+        if (currentVersion == 9):
+            logger.info('In messages.dat database, making TTL-related changes: combining the pubkeyretrynumber and msgretrynumber fields into the retrynumber field and adding the sleeptill and ttl fields...')
+            self.cur.execute('CREATE TEMPORARY TABLE sent_backup (msgid blob, toaddress text, toripe blob, fromaddress text, subject text, message text, ackdata blob, lastactiontime integer, status text, retrynumber integer, folder text, encodingtype int)')
+            self.cur.execute('INSERT INTO sent_backup SELECT msgid, toaddress, toripe, fromaddress, subject, message, ackdata, lastactiontime, status, 0, folder, encodingtype FROM sent;')
+            self.cur.execute('DROP TABLE sent')
+            self.cur.execute('CREATE TABLE sent (msgid blob, toaddress text, toripe blob, fromaddress text, subject text, message text, ackdata blob, senttime integer, lastactiontime integer, sleeptill int, status text, retrynumber integer, folder text, encodingtype int, ttl int)')
+            self.cur.execute('INSERT INTO sent SELECT msgid, toaddress, toripe, fromaddress, subject, message, ackdata, lastactiontime, lastactiontime, 0, status, 0, folder, encodingtype, 216000 FROM sent_backup;')
+            self.cur.execute('DROP TABLE sent_backup')
+            logger.info('In messages.dat database, finished making TTL-related changes.')
+            logger.debug('In messages.dat database, adding address field to the pubkeys table.')
+            self.cur.execute("ALTER TABLE pubkeys ADD address text DEFAULT '' ;")
+            self.cur.execute('UPDATE pubkeys SET address=(enaddr(pubkeys.addressversion, 1, hash)); ')
+            self.cur.execute('CREATE TEMPORARY TABLE pubkeys_backup (address text, addressversion int, transmitdata blob, time int, usedpersonally text, UNIQUE(address) ON CONFLICT REPLACE)')
+            self.cur.execute('INSERT INTO pubkeys_backup SELECT address, addressversion, transmitdata, time, usedpersonally FROM pubkeys;')
+            self.cur.execute('DROP TABLE pubkeys')
+            self.cur.execute('CREATE TABLE pubkeys (address text, addressversion int, transmitdata blob, time int, usedpersonally text, UNIQUE(address) ON CONFLICT REPLACE)')
+            self.cur.execute('INSERT INTO pubkeys SELECT address, addressversion, transmitdata, time, usedpersonally FROM pubkeys_backup;')
+            self.cur.execute('DROP TABLE pubkeys_backup')
+            logger.debug('In messages.dat database, done adding address field to the pubkeys table and removing the hash field.')
+            self.cur.execute("update settings set value=10 WHERE key='version';")
+        item = "SELECT value FROM settings WHERE key='version';"
+        parameters = ''
+        self.cur.execute(item, parameters)
+        currentVersion = int(self.cur.fetchall()[0][0])
+        if (currentVersion == 10):
+            logger.debug('In messages.dat database, updating address column to UNIQUE in the addressbook table.')
+            self.cur.execute('ALTER TABLE addressbook RENAME TO old_addressbook')
+            self.cur.execute('CREATE TABLE addressbook (label text, address text, UNIQUE(address) ON CONFLICT IGNORE)')
+            self.cur.execute('INSERT INTO addressbook SELECT label, address FROM old_addressbook;')
+            self.cur.execute('DROP TABLE old_addressbook')
+            self.cur.execute("update settings set value=11 WHERE key='version';")
+        try:
+            testpayload = '\x00\x00'
+            t = ('1234', 1, testpayload, '12345678', 'no')
+            self.cur.execute('INSERT INTO pubkeys VALUES(?,?,?,?,?)', t)
+            self.conn.commit()
+            self.cur.execute("SELECT transmitdata FROM pubkeys WHERE address='1234' ")
+            queryreturn = self.cur.fetchall()
+            for row in queryreturn:
+                (transmitdata,) = row
+            self.cur.execute("DELETE FROM pubkeys WHERE address='1234' ")
+            self.conn.commit()
+            if (transmitdata == ''):
+                logger.fatal('Problem: The version of SQLite you have cannot store Null values. Please download and install the latest revision of your version of Python (for example, the latest Python 2.7 revision) and try again.\n')
+                logger.fatal('PyBitmessage will now exit very abruptly. You may now see threading errors related to this abrupt exit but the problem you need to solve is related to SQLite.\n\n')
+                os._exit(0)
+        except Exception as err:
+            if (str(err) == 'database or disk is full'):
+                logger.fatal('(While null value test) Alert: Your disk or data storage volume is full. sqlThread will now exit.')
+                queues.UISignalQueue.put(('alert', (_translate('MainWindow', 'Disk full'), _translate('MainWindow', 'Alert: Your disk or data storage volume is full. Bitmessage will now exit.'), True)))
+                os._exit(0)
+            else:
+                logger.error(err)
+        item = "SELECT value FROM settings WHERE key='lastvacuumtime';"
+        parameters = ''
+        self.cur.execute(item, parameters)
+        queryreturn = self.cur.fetchall()
+        for row in queryreturn:
+            (value,) = row
+            if (int(value) < (int(time.time()) - 86400)):
+                logger.info('It has been a long time since the messages.dat file has been vacuumed. Vacuuming now...')
+                try:
+                    self.cur.execute(' VACUUM ')
+                except Exception as err:
+                    if (str(err) == 'database or disk is full'):
+                        logger.fatal('(While VACUUM) Alert: Your disk or data storage volume is full. sqlThread will now exit.')
+                        queues.UISignalQueue.put(('alert', (_translate('MainWindow', 'Disk full'), _translate('MainWindow', 'Alert: Your disk or data storage volume is full. Bitmessage will now exit.'), True)))
+                        os._exit(0)
+                item = "update settings set value=? WHERE key='lastvacuumtime';"
+                parameters = (int(time.time()),)
+                self.cur.execute(item, parameters)
+        helper_sql.sql_ready.set()
+        while True:
+            item = helper_sql.sqlSubmitQueue.get()
+            if (item == 'commit'):
+                try:
+                    self.conn.commit()
+                except Exception as err:
+                    if (str(err) == 'database or disk is full'):
+                        logger.fatal('(While committing) Alert: Your disk or data storage volume is full. sqlThread will now exit.')
+                        queues.UISignalQueue.put(('alert', (_translate('MainWindow', 'Disk full'), _translate('MainWindow', 'Alert: Your disk or data storage volume is full. Bitmessage will now exit.'), True)))
+                        os._exit(0)
+            elif (item == 'exit'):
+                self.conn.close()
+                logger.info('sqlThread exiting gracefully.')
+                return
+            elif (item == 'movemessagstoprog'):
+                logger.debug('the sqlThread is moving the messages.dat file to the local program directory.')
+                try:
+                    self.conn.commit()
+                except Exception as err:
+                    if (str(err) == 'database or disk is full'):
+                        logger.fatal('(while movemessagstoprog) Alert: Your disk or data storage volume is full. sqlThread will now exit.')
+                        queues.UISignalQueue.put(('alert', (_translate('MainWindow', 'Disk full'), _translate('MainWindow', 'Alert: Your disk or data storage volume is full. Bitmessage will now exit.'), True)))
+                        os._exit(0)
+                self.conn.close()
+                shutil.move((paths.lookupAppdataFolder() + 'messages.dat'), (paths.lookupExeFolder() + 'messages.dat'))
+                self.conn = sqlite3.connect((paths.lookupExeFolder() + 'messages.dat'))
+                self.conn.text_factory = str
+                self.cur = self.conn.cursor()
+            elif (item == 'movemessagstoappdata'):
+                logger.debug('the sqlThread is moving the messages.dat file to the Appdata folder.')
+                try:
+                    self.conn.commit()
+                except Exception as err:
+                    if (str(err) == 'database or disk is full'):
+                        logger.fatal('(while movemessagstoappdata) Alert: Your disk or data storage volume is full. sqlThread will now exit.')
+                        queues.UISignalQueue.put(('alert', (_translate('MainWindow', 'Disk full'), _translate('MainWindow', 'Alert: Your disk or data storage volume is full. Bitmessage will now exit.'), True)))
+                        os._exit(0)
+                self.conn.close()
+                shutil.move((paths.lookupExeFolder() + 'messages.dat'), (paths.lookupAppdataFolder() + 'messages.dat'))
+                self.conn = sqlite3.connect((paths.lookupAppdataFolder() + 'messages.dat'))
+                self.conn.text_factory = str
+                self.cur = self.conn.cursor()
+            elif (item == 'deleteandvacuume'):
+                self.cur.execute("delete from inbox where folder='trash' ")
+                self.cur.execute("delete from sent where folder='trash' ")
+                self.conn.commit()
+                try:
+                    self.cur.execute(' VACUUM ')
+                except Exception as err:
+                    if (str(err) == 'database or disk is full'):
+                        logger.fatal('(while deleteandvacuume) Alert: Your disk or data storage volume is full. sqlThread will now exit.')
+                        queues.UISignalQueue.put(('alert', (_translate('MainWindow', 'Disk full'), _translate('MainWindow', 'Alert: Your disk or data storage volume is full. Bitmessage will now exit.'), True)))
+                        os._exit(0)
+            else:
+                parameters = helper_sql.sqlSubmitQueue.get()
+                rowcount = 0
+                try:
+                    self.cur.execute(item, parameters)
+                    rowcount = self.cur.rowcount
+                except Exception as err:
+                    if (str(err) == 'database or disk is full'):
+                        logger.fatal('(while cur.execute) Alert: Your disk or data storage volume is full. sqlThread will now exit.')
+                        queues.UISignalQueue.put(('alert', (_translate('MainWindow', 'Disk full'), _translate('MainWindow', 'Alert: Your disk or data storage volume is full. Bitmessage will now exit.'), True)))
+                        os._exit(0)
+                    else:
+                        logger.fatal('Major error occurred when trying to execute a SQL statement within the sqlThread. Please tell Atheros about this error message or post it in the forum! Error occurred while trying to execute statement: "%s"  Here are the parameters; you might want to censor this data with asterisks (***) as it can contain private information: %s. Here is the actual error message thrown by the sqlThread: %s', str(item), str(repr(parameters)), str(err))
+                        logger.fatal('This program shall now abruptly exit!')
+                    os._exit(0)
+                helper_sql.sqlReturnQueue.put((self.cur.fetchall(), rowcount))
+
+    def create_function(self):
+        try:
+            self.conn.create_function('enaddr', 3, func=encodeAddress, deterministic=True)
+        except (TypeError, sqlite3.NotSupportedError) as err:
+            logger.debug('Got error while pass deterministic in sqlite create function {}, Passing 3 params'.format(err))
+            self.conn.create_function('enaddr', 3, encodeAddress)
+
+op2->op4
+op4->op6
+op6->op8
+op8->op10
+op10->op12
+op12->op14
+op14->op16
+op16->op18
+</textarea></div>
+        <div><button id="run" type="button">Run</button> <button onclick="HelpText()">Format Help</button></div>
+        <div id="HelpTextBlock" style="display:none"><br/>Conditions can also be redirected like cond(yes, bottom) or cond(yes, right)
+... and the other symbols too... like sub1(right)<br/>
+You can also tweak the <b>diagram.drawSVG('diagram', {});</b> script in this file for more changes<br/>
+This is based on <a href="https://github.com/adrai/flowchart.js">flowchart.js on github</a> and <a href="http://flowchart.js.org">http://flowchart.js.org</a> more documentation can be found over there.
+</div><br/><div id="svgbase64"></div>
+        <div id="pngbase64"></div>
+
+        <div id="canvas"></div>
+    </body>
+</html>

@@ -1,0 +1,1124 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <title>api.html</title>
+        <style type="text/css">
+          .end-element { fill : #FFCCFF; }
+        </style>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/raphael/2.3.0/raphael.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/flowchart/1.17.1/flowchart.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.1/js/bootstrap.bundle.min.js"></script>
+        <!-- <script src="../release/flowchart.min.js"></script> -->
+        <script>
+
+            window.onload = function () {
+                var btn = document.getElementById("run"),
+                    cd = document.getElementById("code"),
+                    chart;
+                    
+                (btn.onclick = function () {
+                    var code = cd.value;
+
+                    if (chart) {
+                      chart.clean();
+                    }
+
+                    chart = flowchart.parse(code);
+                    chart.drawSVG('canvas', {
+                      'x': 0,
+                      'y': 0,
+                      'line-width': 3,
+                      //'maxWidth': 15,//ensures the flowcharts fits within a certain width
+                      'line-length': 50,
+                      'text-margin': 10,
+                      'font-size': 14,
+                      'font': 'normal',
+                      'font-family': 'Helvetica',
+                      'font-weight': 'normal',
+                      'font-color': 'black',
+                      'line-color': 'black',
+                      'element-color': 'black',
+                      'fill': 'white',
+                      'yes-text': 'yes',
+                      'no-text': 'no',
+                      'arrow-end': 'block',
+                      'scale': 1,
+                      'symbols': {
+                        'start': {
+                          'font-size': 14,
+                          'font-color': 'yellow',
+                          'element-color': 'blue',
+                          'fill': 'green',
+                          'class': 'start-element'
+                        },
+                        'inputoutput': {
+                          'font-color': 'black',
+                          'element-color': 'black',
+                          'fill': 'bisque'
+                        },
+                        'operation': {
+                          'font-color': 'black',
+                          'element-color': 'black',
+                          'fill': 'linen'
+                        },
+                        'subroutine': {
+                          'font-color': 'black',
+                          'element-color': 'blue',
+                          'fill': 'lightgreen'
+                        },
+                        'condition': {
+                          'font-color': 'red',
+                          'element-color': 'black',
+                          'fill': 'yellow'
+                        },
+                        'end':{
+                          'font-size': 20,
+                          'class': 'end-element'
+                        }
+                      },
+                      'flowstate' : {
+                        //'past' : { 'fill' : '#CCCCCC', 'font-size' : 12},
+                        //'current' : {'fill' : 'yellow', 'font-color' : 'red', 'font-weight' : 'bold'},
+                        //'future' : { 'fill' : '#FFFF99'},
+                        'request' : { 'fill' : 'blue'},
+                        'invalid': {'fill' : '#444444'},
+                        'approved' : { 'fill' : '#58C4A3', 'font-size' : 12, 'yes-text' : 'APPROVED', 'no-text' : 'n/a' },
+                        'rejected' : { 'fill' : '#C45879', 'font-size' : 12, 'yes-text' : 'n/a', 'no-text' : 'REJECTED' }
+                      }
+                    });
+                    //create base64 encoding of SVG to generate download link for title(without html or htm).SVG
+                    var currentCanvasDIV = document.getElementById('canvas')
+                    var currentDrawSVG = currentCanvasDIV.innerHTML.replaceAll('ë','e');
+
+                    const OUTsvgBASE64 = btoa(currentDrawSVG)
+                    doctitle = document.title.replace('.html','');
+                    doctitle = doctitle.replace('.htm','');
+
+
+                    var currentCanvasDIV = document.getElementById('canvas')
+                    var currentDrawSVG = currentCanvasDIV.innerHTML.replaceAll('ë','e');
+                    svgSource = currentDrawSVG
+                    svgXML = currentDrawSVG;
+                    // Use SVG Height and Width from the SVG XML to set canvas size
+                    svgXMLsubstringHeight = svgXML.substring(svgXML.indexOf('height='), svgXML.indexOf('version='));
+                    svgXMLsubstringWidth = svgXML.substring(svgXML.indexOf('width='), svgXML.indexOf('xmlns='));
+                    HeightValue = svgXMLsubstringHeight.substring(svgXMLsubstringHeight.indexOf('"')+1,svgXMLsubstringHeight.lastIndexOf('"'));
+                    WidthValue = svgXMLsubstringWidth.substring(svgXMLsubstringWidth.indexOf('"')+1,svgXMLsubstringWidth.lastIndexOf('"'));
+                    HeightValueInt = Math.round(HeightValue)
+                    WidthValueInt = Math.round(WidthValue)
+                    // setup input for base64SvgToBase64Png
+                    let svgSrc = "data:image/svg+xml;base64,"+OUTsvgBASE64;
+                    var pngBase
+                    imageUtil.base64SvgToBase64Png(svgSrc, WidthValueInt, HeightValueInt).then(pngSrc => {
+                    pngBase = pngSrc
+                    // output download link for base64 PNG converted on download from base64
+                    var pngOutHtml = `<a href="${pngBase}" download="${doctitle}.png">PNG - Click here to download current rendered flowchart as ${doctitle}.png</a>`
+                    document.getElementById("pngbase64").innerHTML=pngOutHtml;
+                    });    
+                    // output download link for base64 SVG converted on download from base64
+                    var svgOutHtml = `<a href="data:image/svg+xml;base64,${OUTsvgBASE64}" download=${doctitle}.svg>SVG - Click here to download current rendered flowchart as ${doctitle}.svg</a> `
+                        document.getElementById("svgbase64").innerHTML=svgOutHtml;
+                    })();
+
+                            };
+                 
+
+// derived from https://stackoverflow.com/a/64800570
+// we need to use web browser canvas to generate a image. In this case png
+let imageUtil = {};
+/**
+ * converts a base64 encoded data url SVG image to a PNG image
+ * @param originalBase64 data url of svg image
+ * @param width target width in pixel of PNG image
+ * @param secondTry used internally to prevent endless recursion
+ * @return {Promise<unknown>} resolves to png data url of the image
+ */
+imageUtil.base64SvgToBase64Png = function (originalBase64, width, height, secondTry) {
+    return new Promise(resolve => {
+        let img = document.createElement('img');
+        img.onload = function () {
+            if (!secondTry && (img.naturalWidth === 0 || img.naturalHeight === 0)) {
+                let svgDoc = base64ToSvgDocument(originalBase64);
+                let fixedDoc = fixSvgDocumentFF(svgDoc);
+                return imageUtil.base64SvgToBase64Png(svgDocumentToBase64(fixedDoc), width, height, true).then(result => {
+                    resolve(result);
+                });
+            }
+            //document.body.appendChild(img);
+            let canvas2 = document.createElement("canvas");
+            //document.body.removeChild(img);
+            canvas2.width = width;
+            canvas2.height = height;
+            let ctx = canvas2.getContext("2d");
+            ctx.drawImage(img, 0, 0, canvas2.width, canvas2.height);
+            try {
+                let data = canvas2.toDataURL('image/png');
+                resolve(data);
+            } catch (e) {
+                resolve(null);
+            }
+        };
+        img.src = originalBase64;
+    });
+}
+
+//needed because Firefox doesn't correctly handle SVG with size = 0, see https://bugzilla.mozilla.org/show_bug.cgi?id=700533
+function fixSvgDocumentFF(svgDocument) {
+    try {
+        let widthInt = parseInt(svgDocument.documentElement.width.baseVal.value) || 500;
+        let heightInt = parseInt(svgDocument.documentElement.height.baseVal.value) || 500;
+        svgDocument.documentElement.width.baseVal.newValueSpecifiedUnits(SVGLength.SVG_LENGTHTYPE_PX, widthInt);
+        svgDocument.documentElement.height.baseVal.newValueSpecifiedUnits(SVGLength.SVG_LENGTHTYPE_PX, heightInt);
+        return svgDocument;
+    } catch (e) {
+        return svgDocument;
+    }
+}
+
+function svgDocumentToBase64(svgDocument) {
+    try {
+        let base64EncodedSVG = btoa(new XMLSerializer().serializeToString(svgDocument));
+        return 'data:image/svg+xml;base64,' + base64EncodedSVG;
+    } catch (e) {
+        return null;
+    }
+}
+
+function base64ToSvgDocument(base64) {
+    let svg = atob(base64.substring(base64.indexOf('base64,') + 7));
+    svg = svg.substring(svg.indexOf('<svg'));
+    let parser = new DOMParser();
+    return parser.parseFromString(svg, "image/svg+xml");
+} 
+        </script>
+
+        <script>
+            function HelpText() {
+              var x = document.getElementById("HelpTextBlock");
+              if (x.style.display === "none") {
+                x.style.display = "block";
+              } else {
+                x.style.display = "none";
+              }
+            }
+        </script>
+    </head>
+    <body>
+        <div><textarea id="code" style="width: 100%;" rows="11">op2=>operation: '\nThis is not what you run to start the Bitmessage API.\nInstead, `enable the API <https://bitmessage.org/wiki/API>`_\nand optionally `enable daemon mode <https://bitmessage.org/wiki/Daemon>`_\nthen run the PyBitmessage.\n\nThe PyBitmessage API is provided either as\n`XML-RPC <http://xmlrpc.scripting.com/spec.html>`_ or\n`JSON-RPC <https://www.jsonrpc.org/specification>`_ like in bitcoin.\nIt\'s selected according to \'apivariant\' setting in config file.\n\nSpecial value ``apivariant=legacy`` is to mimic the old pre 0.6.3\nbehaviour when any results are returned as strings of json.\n\n.. list-table:: All config settings related to API:\n  :header-rows: 0\n\n  * - apienabled = true\n    - if \'false\' the `singleAPI` wont start\n  * - apiinterface = 127.0.0.1\n    - this is the recommended default\n  * - apiport = 8442\n    - the API listens apiinterface:apiport if apiport is not used,\n      random in range (32767, 65535) otherwice\n  * - apivariant = xml\n    - current default for backward compatibility, \'json\' is recommended\n  * - apiusername = username\n    - set the username\n  * - apipassword = password\n    - and the password\n  * - apinotifypath =\n    - not really the API setting, this sets a path for the executable to be ran\n      when certain internal event happens\n\nTo use the API concider such simple example:\n\n.. code-block:: python\n\n    from jsonrpclib import jsonrpc\n\n    from pybitmessage import helper_startup\n    from pybitmessage.bmconfigparser import config\n\n    helper_startup.loadConfig()  # find and load local config file\n    api_uri = "http://%s:%s@127.0.0.1:%s/" % (\n        config.safeGet(\'bitmessagesettings\', \'apiusername\'),\n        config.safeGet(\'bitmessagesettings\', \'apipassword\'),\n        config.safeGet(\'bitmessagesettings\', \'apiport\')\n    )\n    api = jsonrpc.ServerProxy(api_uri)\n    print(api.clientStatus())\n\n\nFor further examples please reference `.tests.test_api`.\n'
+op4=>operation: import base64
+op6=>operation: import errno
+op8=>operation: import hashlib
+op10=>operation: import json
+op12=>operation: import random
+op14=>operation: import socket
+op16=>operation: import subprocess
+op18=>operation: import time
+op20=>operation: from binascii import hexlify, unhexlify
+op22=>operation: from struct import pack, unpack
+op24=>operation: import six
+op26=>operation: from six.moves import configparser, http_client, xmlrpc_server
+op28=>operation: import helper_inbox
+op30=>operation: import helper_sent
+op32=>operation: import protocol
+op34=>operation: import proofofwork
+op36=>operation: import queues
+op38=>operation: import shared
+op40=>operation: import shutdown
+op42=>operation: import state
+op44=>operation: from addresses import addBMIfNotPresent, decodeAddress, decodeVarint, varintDecodeError
+op46=>operation: from bmconfigparser import config
+op48=>operation: from debug import logger
+op50=>operation: from defaults import networkDefaultProofOfWorkNonceTrialsPerByte, networkDefaultPayloadLengthExtraBytes
+op52=>operation: from helper_sql import SqlBulkExecute, sqlExecute, sqlQuery, sqlStoredProcedure, sql_ready
+op54=>operation: from highlevelcrypto import calculateInventoryHash
+op56=>operation: try:
+    from network import connectionpool
+except ImportError:
+    connectionpool = None
+op58=>operation: from network import stats, StoppableThread
+op60=>operation: from version import softwareVersion
+op62=>operation: try:
+    from defusedxml.xmlrpc import monkey_patch
+except ImportError:
+    logger.warning('defusedxml not available, only use API on a secure, closed network.')
+else:
+    monkey_patch()
+op64=>operation: str_chan = '[chan]'
+op66=>operation: str_broadcast_subscribers = '[Broadcast subscribers]'
+op68=>operation: class ErrorCodes(type):
+    'Metaclass for :class:`APIError` documenting error codes.'
+    _CODES = {0: 'Invalid command parameters number', 1: 'The specified passphrase is blank.', 2: 'The address version number currently must be 3, 4, or 0 (which means auto-select).', 3: "The stream number must be 1 (or 0 which means auto-select). Others aren't supported.", 4: 'Why would you ask me to generate 0 addresses for you?', 5: 'You have (accidentally?) specified too many addresses to make. Maximum 999. This check only exists to prevent mischief; if you really want to create more addresses than this, contact the Bitmessage developers and we can modify the check or you can do it yourself by searching the source code for this message.', 6: 'The encoding type must be 2 or 3.', 7: 'Could not decode address', 8: 'Checksum failed for address', 9: 'Invalid characters in address', 10: 'Address version number too high (or zero)', 11: "The address version number currently must be 2, 3 or 4. Others aren't supported. Check the address.", 12: "The stream number must be 1. Others aren't supported. Check the address.", 13: 'Could not find this address in your keys.dat file.', 14: 'Your fromAddress is disabled. Cannot send.', 15: 'Invalid ackData object size.', 16: 'You are already subscribed to that address.', 17: 'Label is not valid UTF-8 data.', 18: 'Chan name does not match address.', 19: 'The length of hash should be 32 bytes (encoded in hex thus 64 characters).', 20: 'Invalid method:', 21: 'Unexpected API Failure', 22: 'Decode error', 23: 'Bool expected in eighteenByteRipe', 24: 'Chan address is already present.', 25: 'Specified address is not a chan address. Use deleteAddress API call instead.', 26: 'Malformed varint in address: ', 27: 'Message is too long.'}
+
+    def __new__(mcs, name, bases, namespace):
+        result = super(ErrorCodes, mcs).__new__(mcs, name, bases, namespace)
+        for code in six.iteritems(mcs._CODES):
+            result.__doc__ += ('   * - %04i\n         - %s\n    ' % code)
+        return result
+op70=>operation: class APIError(xmlrpc_server.Fault):
+    '\n    APIError exception class\n\n    .. list-table:: Possible error values\n       :header-rows: 1\n       :widths: auto\n\n       * - Error Number\n         - Message\n    '
+    __metaclass__ = ErrorCodes
+
+    def __str__(self):
+        return ('API Error %04i: %s' % (self.faultCode, self.faultString))
+op72=>operation: class singleAPI(StoppableThread):
+    'API thread'
+    name = 'singleAPI'
+
+    def stopThread(self):
+        super(singleAPI, self).stopThread()
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            s.connect((config.get('bitmessagesettings', 'apiinterface'), config.getint('bitmessagesettings', 'apiport')))
+            s.shutdown(socket.SHUT_RDWR)
+            s.close()
+        except BaseException:
+            pass
+
+    def run(self):
+        '\n        The instance of `SimpleXMLRPCServer.SimpleXMLRPCServer` or\n        :class:`jsonrpclib.SimpleJSONRPCServer` is created and started here\n        with `BMRPCDispatcher` dispatcher.\n        '
+        port = config.getint('bitmessagesettings', 'apiport')
+        try:
+            getattr(errno, 'WSAEADDRINUSE')
+        except AttributeError:
+            errno.WSAEADDRINUSE = errno.EADDRINUSE
+        RPCServerBase = xmlrpc_server.SimpleXMLRPCServer
+        ct = 'text/xml'
+        if (config.safeGet('bitmessagesettings', 'apivariant') == 'json'):
+            try:
+                from jsonrpclib.SimpleJSONRPCServer import SimpleJSONRPCServer as RPCServerBase
+            except ImportError:
+                logger.warning('jsonrpclib not available, failing back to XML-RPC')
+            else:
+                ct = 'application/json-rpc'
+
+        class StoppableRPCServer(RPCServerBase):
+            'A SimpleXMLRPCServer that honours state.shutdown'
+            allow_reuse_address = True
+            content_type = ct
+
+            def serve_forever(self, poll_interval=None):
+                'Start the RPCServer'
+                sql_ready.wait()
+                while (state.shutdown == 0):
+                    self.handle_request()
+        for attempt in range(50):
+            try:
+                if (attempt > 0):
+                    logger.warning('Failed to start API listener on port %s', port)
+                    port = random.randint(32767, 65535)
+                se = StoppableRPCServer((config.get('bitmessagesettings', 'apiinterface'), port), BMXMLRPCRequestHandler, True, encoding='UTF-8')
+            except socket.error as e:
+                if (e.errno in (errno.EADDRINUSE, errno.WSAEADDRINUSE)):
+                    continue
+            else:
+                if (attempt > 0):
+                    logger.warning('Setting apiport to %s', port)
+                    config.set('bitmessagesettings', 'apiport', str(port))
+                    config.save()
+                break
+        se.register_instance(BMRPCDispatcher())
+        se.register_introspection_functions()
+        apiNotifyPath = config.safeGet('bitmessagesettings', 'apinotifypath')
+        if apiNotifyPath:
+            logger.info('Trying to call %s', apiNotifyPath)
+            try:
+                subprocess.call([apiNotifyPath, 'startingUp'])
+            except OSError:
+                logger.warning('Failed to call %s, removing apinotifypath setting', apiNotifyPath)
+                config.remove_option('bitmessagesettings', 'apinotifypath')
+        se.serve_forever()
+op74=>operation: class CommandHandler(type):
+    '\n    The metaclass for `BMRPCDispatcher` which fills _handlers dict by\n    methods decorated with @command\n    '
+
+    def __new__(mcs, name, bases, namespace):
+        result = super(CommandHandler, mcs).__new__(mcs, name, bases, namespace)
+        result.config = config
+        result._handlers = {}
+        apivariant = result.config.safeGet('bitmessagesettings', 'apivariant')
+        for func in namespace.values():
+            try:
+                for alias in getattr(func, '_cmd'):
+                    try:
+                        (prefix, alias) = alias.split(':')
+                        if (apivariant != prefix):
+                            continue
+                    except ValueError:
+                        pass
+                    result._handlers[alias] = func
+            except AttributeError:
+                pass
+        return result
+op76=>operation: class testmode(object):
+    'Decorator to check testmode & route to command decorator'
+
+    def __init__(self, *aliases):
+        self.aliases = aliases
+
+    def __call__(self, func):
+        'Testmode call method'
+        if (not state.testmode):
+            return None
+        return command(self.aliases[0]).__call__(func)
+op78=>operation: class command(object):
+    'Decorator for API command method'
+
+    def __init__(self, *aliases):
+        self.aliases = aliases
+
+    def __call__(self, func):
+        if (config.safeGet('bitmessagesettings', 'apivariant') == 'legacy'):
+
+            def wrapper(*args):
+                '\n                A wrapper for legacy apivariant which dumps the result\n                into string of json\n                '
+                result = func(*args)
+                return (result if isinstance(result, (int, str)) else json.dumps(result, indent=4))
+            wrapper.__doc__ = func.__doc__
+        else:
+            wrapper = func
+        wrapper._cmd = self.aliases
+        wrapper.__doc__ = (('Commands: *%s*\n\n        ' % ', '.join(self.aliases)) + wrapper.__doc__.lstrip())
+        return wrapper
+op80=>operation: class BMXMLRPCRequestHandler(xmlrpc_server.SimpleXMLRPCRequestHandler):
+    'The main API handler'
+
+    def do_POST(self):
+        "\n        Handles the HTTP POST request.\n\n        Attempts to interpret all HTTP POST requests as XML-RPC calls,\n        which are forwarded to the server's _dispatch method for handling.\n\n        .. note:: this method is the same as in\n          `SimpleXMLRPCServer.SimpleXMLRPCRequestHandler`,\n          just hacked to handle cookies\n        "
+        if (not self.is_rpc_path_valid()):
+            self.report_404()
+            return
+        try:
+            max_chunk_size = ((10 * 1024) * 1024)
+            size_remaining = int(self.headers['content-length'])
+            L = []
+            while size_remaining:
+                chunk_size = min(size_remaining, max_chunk_size)
+                chunk = self.rfile.read(chunk_size)
+                if (not chunk):
+                    break
+                L.append(chunk)
+                size_remaining -= len(L[(- 1)])
+            data = b''.join(L)
+            self.cookies = []
+            validuser = self.APIAuthenticateClient()
+            if (not validuser):
+                time.sleep(2)
+                self.send_response(http_client.UNAUTHORIZED)
+                self.end_headers()
+                return
+            else:
+                response = self.server._marshaled_dispatch(data, getattr(self, '_dispatch', None))
+        except Exception:
+            self.send_response(http_client.INTERNAL_SERVER_ERROR)
+            self.end_headers()
+        else:
+            self.send_response(http_client.OK)
+            self.send_header('Content-type', self.server.content_type)
+            self.send_header('Content-length', str(len(response)))
+            if self.cookies:
+                for cookie in self.cookies:
+                    self.send_header('Set-Cookie', cookie.output(header=''))
+            self.end_headers()
+            self.wfile.write(response)
+            self.wfile.flush()
+            self.connection.shutdown(1)
+            if (state.shutdown is False):
+                shutdown.doCleanShutdown()
+
+    def APIAuthenticateClient(self):
+        '\n        Predicate to check for valid API credentials in the request header\n        '
+        if ('Authorization' in self.headers):
+            encstr = self.headers.get('Authorization').split()[1]
+            (emailid, password) = base64.b64decode(encstr).decode('utf-8').split(':')
+            return ((emailid == config.get('bitmessagesettings', 'apiusername')) and (password == config.get('bitmessagesettings', 'apipassword')))
+        else:
+            logger.warning('Authentication failed because header lacks Authentication field')
+            time.sleep(2)
+        return False
+op82=>operation: @six.add_metaclass(CommandHandler)
+class BMRPCDispatcher(object):
+    'This class is used to dispatch API commands'
+
+    @staticmethod
+    def _decode(text, decode_type):
+        try:
+            if (decode_type == 'hex'):
+                return unhexlify(text)
+            elif (decode_type == 'base64'):
+                return base64.b64decode(text)
+        except Exception as e:
+            raise APIError(22, ('Decode error - %s. Had trouble while decoding string: %r' % (e, text)))
+
+    def _verifyAddress(self, address):
+        (status, addressVersionNumber, streamNumber, ripe) = decodeAddress(address)
+        if (status != 'success'):
+            if (status == 'checksumfailed'):
+                raise APIError(8, ('Checksum failed for address: ' + address))
+            if (status == 'invalidcharacters'):
+                raise APIError(9, ('Invalid characters in address: ' + address))
+            if (status == 'versiontoohigh'):
+                raise APIError(10, ('Address version number too high (or zero) in address: ' + address))
+            if (status == 'varintmalformed'):
+                raise APIError(26, ('Malformed varint in address: ' + address))
+            raise APIError(7, ('Could not decode address: %s : %s' % (address, status)))
+        if ((addressVersionNumber < 2) or (addressVersionNumber > 4)):
+            raise APIError(11, "The address version number currently must be 2, 3 or 4. Others aren't supported. Check the address.")
+        if (streamNumber != 1):
+            raise APIError(12, "The stream number must be 1. Others aren't supported. Check the address.")
+        return ({'status': status, 'addressVersion': addressVersionNumber, 'streamNumber': streamNumber, 'ripe': base64.b64encode(ripe)} if (self._method == 'decodeAddress') else (status, addressVersionNumber, streamNumber, ripe))
+
+    @staticmethod
+    def _dump_inbox_message(msgid, toAddress, fromAddress, subject, received, message, encodingtype, read):
+        subject = shared.fixPotentiallyInvalidUTF8Data(subject)
+        message = shared.fixPotentiallyInvalidUTF8Data(message)
+        return {'msgid': hexlify(msgid), 'toAddress': toAddress, 'fromAddress': fromAddress, 'subject': base64.b64encode(subject), 'message': base64.b64encode(message), 'encodingType': encodingtype, 'receivedTime': received, 'read': read}
+
+    @staticmethod
+    def _dump_sent_message(msgid, toAddress, fromAddress, subject, lastactiontime, message, encodingtype, status, ackdata):
+        subject = shared.fixPotentiallyInvalidUTF8Data(subject)
+        message = shared.fixPotentiallyInvalidUTF8Data(message)
+        return {'msgid': hexlify(msgid), 'toAddress': toAddress, 'fromAddress': fromAddress, 'subject': base64.b64encode(subject), 'message': base64.b64encode(message), 'encodingType': encodingtype, 'lastActionTime': lastactiontime, 'status': status, 'ackData': hexlify(ackdata)}
+
+    @command('decodeAddress')
+    def HandleDecodeAddress(self, address):
+        '\n        Decode given address and return dict with\n        status, addressVersion, streamNumber and ripe keys\n        '
+        return self._verifyAddress(address)
+
+    @command('listAddresses', 'listAddresses2')
+    def HandleListAddresses(self):
+        '\n        Returns dict with a list of all used addresses with their properties\n        in the *addresses* key.\n        '
+        data = []
+        for address in self.config.addresses():
+            streamNumber = decodeAddress(address)[2]
+            label = self.config.get(address, 'label')
+            if (self._method == 'listAddresses2'):
+                label = base64.b64encode(label)
+            data.append({'label': label, 'address': address, 'stream': streamNumber, 'enabled': self.config.safeGetBoolean(address, 'enabled'), 'chan': self.config.safeGetBoolean(address, 'chan')})
+        return {'addresses': data}
+
+    @command('listAddressBookEntries', 'legacy:listAddressbook')
+    def HandleListAddressBookEntries(self, label=None):
+        '\n        Returns dict with a list of all address book entries (address and label)\n        in the *addresses* key.\n        '
+        queryreturn = (sqlQuery('SELECT label, address from addressbook WHERE label = ?', label) if label else sqlQuery('SELECT label, address from addressbook'))
+        data = []
+        for (label, address) in queryreturn:
+            label = shared.fixPotentiallyInvalidUTF8Data(label)
+            data.append({'label': base64.b64encode(label), 'address': address})
+        return {'addresses': data}
+
+    @command('addAddressBookEntry', 'legacy:addAddressbook')
+    def HandleAddAddressBookEntry(self, address, label):
+        'Add an entry to address book. label must be base64 encoded.'
+        label = self._decode(label, 'base64')
+        address = addBMIfNotPresent(address)
+        self._verifyAddress(address)
+        queryreturn = sqlQuery('SELECT address FROM addressbook WHERE address=?', address)
+        if (queryreturn != []):
+            raise APIError(16, 'You already have this address in your address book.')
+        sqlExecute('INSERT INTO addressbook VALUES(?,?)', label, address)
+        queues.UISignalQueue.put(('rerenderMessagelistFromLabels', ''))
+        queues.UISignalQueue.put(('rerenderMessagelistToLabels', ''))
+        queues.UISignalQueue.put(('rerenderAddressBook', ''))
+        return ('Added address %s to address book' % address)
+
+    @command('deleteAddressBookEntry', 'legacy:deleteAddressbook')
+    def HandleDeleteAddressBookEntry(self, address):
+        'Delete an entry from address book.'
+        address = addBMIfNotPresent(address)
+        self._verifyAddress(address)
+        sqlExecute('DELETE FROM addressbook WHERE address=?', address)
+        queues.UISignalQueue.put(('rerenderMessagelistFromLabels', ''))
+        queues.UISignalQueue.put(('rerenderMessagelistToLabels', ''))
+        queues.UISignalQueue.put(('rerenderAddressBook', ''))
+        return ('Deleted address book entry for %s if it existed' % address)
+
+    @command('createRandomAddress')
+    def HandleCreateRandomAddress(self, label, eighteenByteRipe=False, totalDifficulty=0, smallMessageDifficulty=0):
+        '\n        Create one address using the random number generator.\n\n        :param str label: base64 encoded label for the address\n        :param bool eighteenByteRipe: is telling Bitmessage whether to\n          generate an address with an 18 byte RIPE hash\n          (as opposed to a 19 byte hash).\n        '
+        nonceTrialsPerByte = (self.config.get('bitmessagesettings', 'defaultnoncetrialsperbyte') if (not totalDifficulty) else int((networkDefaultProofOfWorkNonceTrialsPerByte * totalDifficulty)))
+        payloadLengthExtraBytes = (self.config.get('bitmessagesettings', 'defaultpayloadlengthextrabytes') if (not smallMessageDifficulty) else int((networkDefaultPayloadLengthExtraBytes * smallMessageDifficulty)))
+        if (not isinstance(eighteenByteRipe, bool)):
+            raise APIError(23, ('Bool expected in eighteenByteRipe, saw %s instead' % type(eighteenByteRipe)))
+        label = self._decode(label, 'base64')
+        try:
+            label.decode('utf-8')
+        except UnicodeDecodeError:
+            raise APIError(17, 'Label is not valid UTF-8 data.')
+        queues.apiAddressGeneratorReturnQueue.queue.clear()
+        streamNumberForAddress = 1
+        queues.addressGeneratorQueue.put(('createRandomAddress', 4, streamNumberForAddress, label, 1, '', eighteenByteRipe, nonceTrialsPerByte, payloadLengthExtraBytes))
+        return queues.apiAddressGeneratorReturnQueue.get()
+
+    @command('createDeterministicAddresses')
+    def HandleCreateDeterministicAddresses(self, passphrase, numberOfAddresses=1, addressVersionNumber=0, streamNumber=0, eighteenByteRipe=False, totalDifficulty=0, smallMessageDifficulty=0):
+        '\n        Create many addresses deterministically using the passphrase.\n\n        :param str passphrase: base64 encoded passphrase\n        :param int numberOfAddresses: number of addresses to create,\n          up to 999\n\n        *addressVersionNumber* and *streamNumber* may be set to 0\n        which will tell Bitmessage to use the most up-to-date\n        address version and the most available stream.\n        '
+        nonceTrialsPerByte = (self.config.get('bitmessagesettings', 'defaultnoncetrialsperbyte') if (not totalDifficulty) else int((networkDefaultProofOfWorkNonceTrialsPerByte * totalDifficulty)))
+        payloadLengthExtraBytes = (self.config.get('bitmessagesettings', 'defaultpayloadlengthextrabytes') if (not smallMessageDifficulty) else int((networkDefaultPayloadLengthExtraBytes * smallMessageDifficulty)))
+        if (not passphrase):
+            raise APIError(1, 'The specified passphrase is blank.')
+        if (not isinstance(eighteenByteRipe, bool)):
+            raise APIError(23, ('Bool expected in eighteenByteRipe, saw %s instead' % type(eighteenByteRipe)))
+        passphrase = self._decode(passphrase, 'base64')
+        if (addressVersionNumber == 0):
+            addressVersionNumber = 4
+        if (addressVersionNumber not in (3, 4)):
+            raise APIError(2, ("The address version number currently must be 3, 4, or 0 (which means auto-select). %i isn't supported." % addressVersionNumber))
+        if (streamNumber == 0):
+            streamNumber = 1
+        if (streamNumber != 1):
+            raise APIError(3, "The stream number must be 1 (or 0 which means auto-select). Others aren't supported.")
+        if (numberOfAddresses == 0):
+            raise APIError(4, 'Why would you ask me to generate 0 addresses for you?')
+        if (numberOfAddresses > 999):
+            raise APIError(5, 'You have (accidentally?) specified too many addresses to make. Maximum 999. This check only exists to prevent mischief; if you really want to create more addresses than this, contact the Bitmessage developers and we can modify the check or you can do it yourself by searching the source code for this message.')
+        queues.apiAddressGeneratorReturnQueue.queue.clear()
+        logger.debug('Requesting that the addressGenerator create %s addresses.', numberOfAddresses)
+        queues.addressGeneratorQueue.put(('createDeterministicAddresses', addressVersionNumber, streamNumber, 'unused API address', numberOfAddresses, passphrase, eighteenByteRipe, nonceTrialsPerByte, payloadLengthExtraBytes))
+        return {'addresses': queues.apiAddressGeneratorReturnQueue.get()}
+
+    @command('getDeterministicAddress')
+    def HandleGetDeterministicAddress(self, passphrase, addressVersionNumber, streamNumber):
+        '\n        Similar to *createDeterministicAddresses* except that the one\n        address that is returned will not be added to the Bitmessage\n        user interface or the keys.dat file.\n        '
+        numberOfAddresses = 1
+        eighteenByteRipe = False
+        if (not passphrase):
+            raise APIError(1, 'The specified passphrase is blank.')
+        passphrase = self._decode(passphrase, 'base64')
+        if (addressVersionNumber not in (3, 4)):
+            raise APIError(2, ("The address version number currently must be 3 or 4. %i isn't supported." % addressVersionNumber))
+        if (streamNumber != 1):
+            raise APIError(3, " The stream number must be 1. Others aren't supported.")
+        queues.apiAddressGeneratorReturnQueue.queue.clear()
+        logger.debug('Requesting that the addressGenerator create %s addresses.', numberOfAddresses)
+        queues.addressGeneratorQueue.put(('getDeterministicAddress', addressVersionNumber, streamNumber, 'unused API address', numberOfAddresses, passphrase, eighteenByteRipe))
+        return queues.apiAddressGeneratorReturnQueue.get()
+
+    @command('createChan')
+    def HandleCreateChan(self, passphrase):
+        '\n        Creates a new chan. passphrase must be base64 encoded.\n        Returns the corresponding Bitmessage address.\n        '
+        passphrase = self._decode(passphrase, 'base64')
+        if (not passphrase):
+            raise APIError(1, 'The specified passphrase is blank.')
+        try:
+            passphrase.decode('utf-8')
+            label = ((str_chan + ' ') + passphrase)
+        except UnicodeDecodeError:
+            label = ((str_chan + ' ') + repr(passphrase))
+        addressVersionNumber = 4
+        streamNumber = 1
+        queues.apiAddressGeneratorReturnQueue.queue.clear()
+        logger.debug('Requesting that the addressGenerator create chan %s.', passphrase)
+        queues.addressGeneratorQueue.put(('createChan', addressVersionNumber, streamNumber, label, passphrase, True))
+        queueReturn = queues.apiAddressGeneratorReturnQueue.get()
+        try:
+            return queueReturn[0]
+        except IndexError:
+            raise APIError(24, 'Chan address is already present.')
+
+    @command('joinChan')
+    def HandleJoinChan(self, passphrase, suppliedAddress):
+        "\n        Join a chan. passphrase must be base64 encoded. Returns 'success'.\n        "
+        passphrase = self._decode(passphrase, 'base64')
+        if (not passphrase):
+            raise APIError(1, 'The specified passphrase is blank.')
+        try:
+            passphrase.decode('utf-8')
+            label = ((str_chan + ' ') + passphrase)
+        except UnicodeDecodeError:
+            label = ((str_chan + ' ') + repr(passphrase))
+        self._verifyAddress(suppliedAddress)
+        suppliedAddress = addBMIfNotPresent(suppliedAddress)
+        queues.apiAddressGeneratorReturnQueue.queue.clear()
+        queues.addressGeneratorQueue.put(('joinChan', suppliedAddress, label, passphrase, True))
+        queueReturn = queues.apiAddressGeneratorReturnQueue.get()
+        try:
+            if (queueReturn[0] == 'chan name does not match address'):
+                raise APIError(18, 'Chan name does not match address.')
+        except IndexError:
+            raise APIError(24, 'Chan address is already present.')
+        return 'success'
+
+    @command('leaveChan')
+    def HandleLeaveChan(self, address):
+        "\n        Leave a chan. Returns 'success'.\n\n        .. note:: at this time, the address is still shown in the UI\n          until a restart.\n        "
+        self._verifyAddress(address)
+        address = addBMIfNotPresent(address)
+        if (not self.config.safeGetBoolean(address, 'chan')):
+            raise APIError(25, 'Specified address is not a chan address. Use deleteAddress API call instead.')
+        try:
+            self.config.remove_section(address)
+        except configparser.NoSectionError:
+            raise APIError(13, 'Could not find this address in your keys.dat file.')
+        self.config.save()
+        queues.UISignalQueue.put(('rerenderMessagelistFromLabels', ''))
+        queues.UISignalQueue.put(('rerenderMessagelistToLabels', ''))
+        return 'success'
+
+    @command('deleteAddress')
+    def HandleDeleteAddress(self, address):
+        "\n        Permanently delete the address from keys.dat file. Returns 'success'.\n        "
+        self._verifyAddress(address)
+        address = addBMIfNotPresent(address)
+        try:
+            self.config.remove_section(address)
+        except configparser.NoSectionError:
+            raise APIError(13, 'Could not find this address in your keys.dat file.')
+        self.config.save()
+        queues.UISignalQueue.put(('writeNewAddressToTable', ('', '', '')))
+        shared.reloadMyAddressHashes()
+        return 'success'
+
+    @command('enableAddress')
+    def HandleEnableAddress(self, address, enable=True):
+        'Enable or disable the address depending on the *enable* value'
+        self._verifyAddress(address)
+        address = addBMIfNotPresent(address)
+        config.set(address, 'enabled', str(enable))
+        self.config.save()
+        shared.reloadMyAddressHashes()
+        return 'success'
+
+    @command('getAllInboxMessages')
+    def HandleGetAllInboxMessages(self):
+        '\n        Returns a dict with all inbox messages in the *inboxMessages* key.\n        The message is a dict with such keys:\n        *msgid*, *toAddress*, *fromAddress*, *subject*, *message*,\n        *encodingType*, *receivedTime*, *read*.\n        *msgid* is hex encoded string.\n        *subject* and *message* are base64 encoded.\n        '
+        queryreturn = sqlQuery("SELECT msgid, toaddress, fromaddress, subject, received, message, encodingtype, read FROM inbox WHERE folder='inbox' ORDER BY received")
+        return {'inboxMessages': [self._dump_inbox_message(*data) for data in queryreturn]}
+
+    @command('getAllInboxMessageIds', 'getAllInboxMessageIDs')
+    def HandleGetAllInboxMessageIds(self):
+        '\n        The same as *getAllInboxMessages* but returns only *msgid*s,\n        result key - *inboxMessageIds*.\n        '
+        queryreturn = sqlQuery("SELECT msgid FROM inbox where folder='inbox' ORDER BY received")
+        return {'inboxMessageIds': [{'msgid': hexlify(msgid)} for (msgid,) in queryreturn]}
+
+    @command('getInboxMessageById', 'getInboxMessageByID')
+    def HandleGetInboxMessageById(self, hid, readStatus=None):
+        "\n        Returns a dict with list containing single message in the result\n        key *inboxMessage*. May also return None if message was not found.\n\n        :param str hid: hex encoded msgid\n        :param bool readStatus: sets the message's read status if present\n        "
+        msgid = self._decode(hid, 'hex')
+        if (readStatus is not None):
+            if (not isinstance(readStatus, bool)):
+                raise APIError(23, ('Bool expected in readStatus, saw %s instead.' % type(readStatus)))
+            queryreturn = sqlQuery('SELECT read FROM inbox WHERE msgid=?', msgid)
+            try:
+                if ((queryreturn[0][0] == 1) != readStatus):
+                    sqlExecute('UPDATE inbox set read = ? WHERE msgid=?', readStatus, msgid)
+                    queues.UISignalQueue.put(('changedInboxUnread', None))
+            except IndexError:
+                pass
+        queryreturn = sqlQuery('SELECT msgid, toaddress, fromaddress, subject, received, message, encodingtype, read FROM inbox WHERE msgid=?', msgid)
+        try:
+            return {'inboxMessage': [self._dump_inbox_message(*queryreturn[0])]}
+        except IndexError:
+            pass
+
+    @command('getAllSentMessages')
+    def HandleGetAllSentMessages(self):
+        '\n        The same as *getAllInboxMessages* but for sent,\n        result key - *sentMessages*. Message dict keys are:\n        *msgid*, *toAddress*, *fromAddress*, *subject*, *message*,\n        *encodingType*, *lastActionTime*, *status*, *ackData*.\n        *ackData* is also a hex encoded string.\n        '
+        queryreturn = sqlQuery("SELECT msgid, toaddress, fromaddress, subject, lastactiontime, message, encodingtype, status, ackdata FROM sent WHERE folder='sent' ORDER BY lastactiontime")
+        return {'sentMessages': [self._dump_sent_message(*data) for data in queryreturn]}
+
+    @command('getAllSentMessageIds', 'getAllSentMessageIDs')
+    def HandleGetAllSentMessageIds(self):
+        '\n        The same as *getAllInboxMessageIds* but for sent,\n        result key - *sentMessageIds*.\n        '
+        queryreturn = sqlQuery("SELECT msgid FROM sent WHERE folder='sent' ORDER BY lastactiontime")
+        return {'sentMessageIds': [{'msgid': hexlify(msgid)} for (msgid,) in queryreturn]}
+
+    @command('getInboxMessagesByReceiver', 'legacy:getInboxMessagesByAddress')
+    def HandleInboxMessagesByReceiver(self, toAddress):
+        '\n        The same as *getAllInboxMessages* but returns only messages\n        for toAddress.\n        '
+        queryreturn = sqlQuery("SELECT msgid, toaddress, fromaddress, subject, received, message, encodingtype, read FROM inbox WHERE folder='inbox' AND toAddress=?", toAddress)
+        return {'inboxMessages': [self._dump_inbox_message(*data) for data in queryreturn]}
+
+    @command('getSentMessageById', 'getSentMessageByID')
+    def HandleGetSentMessageById(self, hid):
+        "\n        Similiar to *getInboxMessageById* but doesn't change message's\n        read status (sent messages have no such field).\n        Result key is *sentMessage*\n        "
+        msgid = self._decode(hid, 'hex')
+        queryreturn = sqlQuery('SELECT msgid, toaddress, fromaddress, subject, lastactiontime, message, encodingtype, status, ackdata FROM sent WHERE msgid=?', msgid)
+        try:
+            return {'sentMessage': [self._dump_sent_message(*queryreturn[0])]}
+        except IndexError:
+            pass
+
+    @command('getSentMessagesByAddress', 'getSentMessagesBySender')
+    def HandleGetSentMessagesByAddress(self, fromAddress):
+        '\n        The same as *getAllSentMessages* but returns only messages\n        from fromAddress.\n        '
+        queryreturn = sqlQuery("SELECT msgid, toaddress, fromaddress, subject, lastactiontime, message, encodingtype, status, ackdata FROM sent WHERE folder='sent' AND fromAddress=? ORDER BY lastactiontime", fromAddress)
+        return {'sentMessages': [self._dump_sent_message(*data) for data in queryreturn]}
+
+    @command('getSentMessageByAckData')
+    def HandleGetSentMessagesByAckData(self, ackData):
+        '\n        Similiar to *getSentMessageById* but searches by ackdata\n        (also hex encoded).\n        '
+        ackData = self._decode(ackData, 'hex')
+        queryreturn = sqlQuery('SELECT msgid, toaddress, fromaddress, subject, lastactiontime, message, encodingtype, status, ackdata FROM sent WHERE ackdata=?', ackData)
+        try:
+            return {'sentMessage': [self._dump_sent_message(*queryreturn[0])]}
+        except IndexError:
+            pass
+
+    @command('trashMessage')
+    def HandleTrashMessage(self, msgid):
+        '\n        Trash message by msgid (encoded in hex). Returns a simple message\n        saying that the message was trashed assuming it ever even existed.\n        Prior existence is not checked.\n        '
+        msgid = self._decode(msgid, 'hex')
+        helper_inbox.trash(msgid)
+        sqlExecute("UPDATE sent SET folder='trash' WHERE msgid=?", msgid)
+        return 'Trashed message (assuming message existed).'
+
+    @command('trashInboxMessage')
+    def HandleTrashInboxMessage(self, msgid):
+        'Trash inbox message by msgid (encoded in hex).'
+        msgid = self._decode(msgid, 'hex')
+        helper_inbox.trash(msgid)
+        return 'Trashed inbox message (assuming message existed).'
+
+    @command('trashSentMessage')
+    def HandleTrashSentMessage(self, msgid):
+        'Trash sent message by msgid (encoded in hex).'
+        msgid = self._decode(msgid, 'hex')
+        sqlExecute("UPDATE sent SET folder='trash' WHERE msgid=?", msgid)
+        return 'Trashed sent message (assuming message existed).'
+
+    @command('sendMessage')
+    def HandleSendMessage(self, toAddress, fromAddress, subject, message, encodingType=2, TTL=(((4 * 24) * 60) * 60)):
+        '\n        Send the message and return ackdata (hex encoded string).\n        subject and message must be encoded in base64 which may optionally\n        include line breaks. TTL is specified in seconds; values outside\n        the bounds of 3600 to 2419200 will be moved to be within those\n        bounds. TTL defaults to 4 days.\n        '
+        if (encodingType not in (2, 3)):
+            raise APIError(6, 'The encoding type must be 2 or 3.')
+        subject = self._decode(subject, 'base64')
+        message = self._decode(message, 'base64')
+        if (len((subject + message)) > ((2 ** 18) - 500)):
+            raise APIError(27, 'Message is too long.')
+        if (TTL < (60 * 60)):
+            TTL = (60 * 60)
+        if (TTL > (((28 * 24) * 60) * 60)):
+            TTL = (((28 * 24) * 60) * 60)
+        toAddress = addBMIfNotPresent(toAddress)
+        fromAddress = addBMIfNotPresent(fromAddress)
+        self._verifyAddress(fromAddress)
+        try:
+            fromAddressEnabled = self.config.getboolean(fromAddress, 'enabled')
+        except configparser.NoSectionError:
+            raise APIError(13, 'Could not find your fromAddress in the keys.dat file.')
+        if (not fromAddressEnabled):
+            raise APIError(14, 'Your fromAddress is disabled. Cannot send.')
+        ackdata = helper_sent.insert(toAddress=toAddress, fromAddress=fromAddress, subject=subject, message=message, encoding=encodingType, ttl=TTL)
+        toLabel = ''
+        queryreturn = sqlQuery('SELECT label FROM addressbook WHERE address=?', toAddress)
+        try:
+            toLabel = queryreturn[0][0]
+        except IndexError:
+            pass
+        queues.UISignalQueue.put(('displayNewSentMessage', (toAddress, toLabel, fromAddress, subject, message, ackdata)))
+        queues.workerQueue.put(('sendmessage', toAddress))
+        return hexlify(ackdata)
+
+    @command('sendBroadcast')
+    def HandleSendBroadcast(self, fromAddress, subject, message, encodingType=2, TTL=(((4 * 24) * 60) * 60)):
+        'Send the broadcast message. Similiar to *sendMessage*.'
+        if (encodingType not in (2, 3)):
+            raise APIError(6, 'The encoding type must be 2 or 3.')
+        subject = self._decode(subject, 'base64')
+        message = self._decode(message, 'base64')
+        if (len((subject + message)) > ((2 ** 18) - 500)):
+            raise APIError(27, 'Message is too long.')
+        if (TTL < (60 * 60)):
+            TTL = (60 * 60)
+        if (TTL > (((28 * 24) * 60) * 60)):
+            TTL = (((28 * 24) * 60) * 60)
+        fromAddress = addBMIfNotPresent(fromAddress)
+        self._verifyAddress(fromAddress)
+        try:
+            fromAddressEnabled = self.config.getboolean(fromAddress, 'enabled')
+        except configparser.NoSectionError:
+            raise APIError(13, 'Could not find your fromAddress in the keys.dat file.')
+        if (not fromAddressEnabled):
+            raise APIError(14, 'Your fromAddress is disabled. Cannot send.')
+        toAddress = str_broadcast_subscribers
+        ackdata = helper_sent.insert(fromAddress=fromAddress, subject=subject, message=message, status='broadcastqueued', encoding=encodingType)
+        toLabel = str_broadcast_subscribers
+        queues.UISignalQueue.put(('displayNewSentMessage', (toAddress, toLabel, fromAddress, subject, message, ackdata)))
+        queues.workerQueue.put(('sendbroadcast', ''))
+        return hexlify(ackdata)
+
+    @command('getStatus')
+    def HandleGetStatus(self, ackdata):
+        '\n        Get the status of sent message by its ackdata (hex encoded).\n        Returns one of these strings: notfound, msgqueued,\n        broadcastqueued, broadcastsent, doingpubkeypow, awaitingpubkey,\n        doingmsgpow, forcepow, msgsent, msgsentnoackexpected or ackreceived.\n        '
+        if (len(ackdata) < 76):
+            raise APIError(15, 'Invalid ackData object size.')
+        ackdata = self._decode(ackdata, 'hex')
+        queryreturn = sqlQuery('SELECT status FROM sent where ackdata=?', ackdata)
+        try:
+            return queryreturn[0][0]
+        except IndexError:
+            return 'notfound'
+
+    @command('addSubscription')
+    def HandleAddSubscription(self, address, label=''):
+        'Subscribe to the address. label must be base64 encoded.'
+        if label:
+            label = self._decode(label, 'base64')
+            try:
+                label.decode('utf-8')
+            except UnicodeDecodeError:
+                raise APIError(17, 'Label is not valid UTF-8 data.')
+        self._verifyAddress(address)
+        address = addBMIfNotPresent(address)
+        queryreturn = sqlQuery('SELECT * FROM subscriptions WHERE address=?', address)
+        if queryreturn:
+            raise APIError(16, 'You are already subscribed to that address.')
+        sqlExecute('INSERT INTO subscriptions VALUES (?,?,?)', label, address, True)
+        shared.reloadBroadcastSendersForWhichImWatching()
+        queues.UISignalQueue.put(('rerenderMessagelistFromLabels', ''))
+        queues.UISignalQueue.put(('rerenderSubscriptions', ''))
+        return 'Added subscription.'
+
+    @command('deleteSubscription')
+    def HandleDeleteSubscription(self, address):
+        '\n        Unsubscribe from the address. The program does not check whether\n        you were subscribed in the first place.\n        '
+        address = addBMIfNotPresent(address)
+        sqlExecute('DELETE FROM subscriptions WHERE address=?', address)
+        shared.reloadBroadcastSendersForWhichImWatching()
+        queues.UISignalQueue.put(('rerenderMessagelistFromLabels', ''))
+        queues.UISignalQueue.put(('rerenderSubscriptions', ''))
+        return 'Deleted subscription if it existed.'
+
+    @command('listSubscriptions')
+    def ListSubscriptions(self):
+        '\n        Returns dict with a list of all subscriptions\n        in the *subscriptions* key.\n        '
+        queryreturn = sqlQuery('SELECT label, address, enabled FROM subscriptions')
+        data = []
+        for (label, address, enabled) in queryreturn:
+            label = shared.fixPotentiallyInvalidUTF8Data(label)
+            data.append({'label': base64.b64encode(label), 'address': address, 'enabled': (enabled == 1)})
+        return {'subscriptions': data}
+
+    @command('disseminatePreEncryptedMsg', 'disseminatePreparedObject')
+    def HandleDisseminatePreparedObject(self, encryptedPayload, nonceTrialsPerByte=networkDefaultProofOfWorkNonceTrialsPerByte, payloadLengthExtraBytes=networkDefaultPayloadLengthExtraBytes):
+        '\n        Handle a request to disseminate an encrypted message.\n\n        The device issuing this command to PyBitmessage supplies an object\n        that has already been encrypted but which may still need the PoW\n        to be done. PyBitmessage accepts this object and sends it out\n        to the rest of the Bitmessage network as if it had generated\n        the message itself.\n\n        *encryptedPayload* is a hex encoded string starting with the nonce,\n        8 zero bytes in case of no PoW done.\n        '
+        encryptedPayload = self._decode(encryptedPayload, 'hex')
+        (nonce,) = unpack('>Q', encryptedPayload[:8])
+        (objectType, toStreamNumber, expiresTime) = protocol.decodeObjectParameters(encryptedPayload)
+        if (nonce == 0):
+            encryptedPayload = encryptedPayload[8:]
+            TTL = ((expiresTime - time.time()) + 300)
+            logger.debug('expiresTime: %s', expiresTime)
+            logger.debug('TTL: %s', TTL)
+            logger.debug('objectType: %s', objectType)
+            logger.info('(For msg message via API) Doing proof of work. Total required difficulty: %s\nRequired small message difficulty: %s', (float(nonceTrialsPerByte) / networkDefaultProofOfWorkNonceTrialsPerByte), (float(payloadLengthExtraBytes) / networkDefaultPayloadLengthExtraBytes))
+            powStartTime = time.time()
+            target = ((2 ** 64) / (nonceTrialsPerByte * (((len(encryptedPayload) + 8) + payloadLengthExtraBytes) + ((TTL * ((len(encryptedPayload) + 8) + payloadLengthExtraBytes)) / (2 ** 16)))))
+            initialHash = hashlib.sha512(encryptedPayload).digest()
+            (trialValue, nonce) = proofofwork.run(target, initialHash)
+            logger.info('(For msg message via API) Found proof of work %s\nNonce: %s\nPOW took %s seconds. %s nonce trials per second.', trialValue, nonce, int((time.time() - powStartTime)), (nonce / (time.time() - powStartTime)))
+            encryptedPayload = (pack('>Q', nonce) + encryptedPayload)
+        inventoryHash = calculateInventoryHash(encryptedPayload)
+        state.Inventory[inventoryHash] = (objectType, toStreamNumber, encryptedPayload, expiresTime, b'')
+        logger.info('Broadcasting inv for msg(API disseminatePreEncryptedMsg command): %s', hexlify(inventoryHash))
+        queues.invQueue.put((toStreamNumber, inventoryHash))
+        return hexlify(inventoryHash).decode()
+
+    @command('trashSentMessageByAckData')
+    def HandleTrashSentMessageByAckDAta(self, ackdata):
+        'Trash a sent message by ackdata (hex encoded)'
+        ackdata = self._decode(ackdata, 'hex')
+        sqlExecute("UPDATE sent SET folder='trash' WHERE ackdata=?", ackdata)
+        return 'Trashed sent message (assuming message existed).'
+
+    @command('disseminatePubkey')
+    def HandleDissimatePubKey(self, payload):
+        'Handle a request to disseminate a public key'
+        payload = self._decode(payload, 'hex')
+        target = ((2 ** 64) / (((len(payload) + networkDefaultPayloadLengthExtraBytes) + 8) * networkDefaultProofOfWorkNonceTrialsPerByte))
+        logger.info('(For pubkey message via API) Doing proof of work...')
+        initialHash = hashlib.sha512(payload).digest()
+        (trialValue, nonce) = proofofwork.run(target, initialHash)
+        logger.info('(For pubkey message via API) Found proof of work %s Nonce: %s', trialValue, nonce)
+        payload = (pack('>Q', nonce) + payload)
+        pubkeyReadPosition = 8
+        if (payload[pubkeyReadPosition:(pubkeyReadPosition + 4)] == '\x00\x00\x00\x00'):
+            pubkeyReadPosition += 8
+        else:
+            pubkeyReadPosition += 4
+        addressVersionLength = decodeVarint(payload[pubkeyReadPosition:(pubkeyReadPosition + 10)])[1]
+        pubkeyReadPosition += addressVersionLength
+        pubkeyStreamNumber = decodeVarint(payload[pubkeyReadPosition:(pubkeyReadPosition + 10)])[0]
+        inventoryHash = calculateInventoryHash(payload)
+        objectType = 1
+        TTL = (((28 * 24) * 60) * 60)
+        state.Inventory[inventoryHash] = (objectType, pubkeyStreamNumber, payload, (int(time.time()) + TTL), '')
+        logger.info('broadcasting inv within API command disseminatePubkey with hash: %s', hexlify(inventoryHash))
+        queues.invQueue.put((pubkeyStreamNumber, inventoryHash))
+
+    @command('getMessageDataByDestinationHash', 'getMessageDataByDestinationTag')
+    def HandleGetMessageDataByDestinationHash(self, requestedHash):
+        'Handle a request to get message data by destination hash'
+        if (len(requestedHash) != 32):
+            raise APIError(19, 'The length of hash should be 32 bytes (encoded in hex thus 64 characters).')
+        requestedHash = self._decode(requestedHash, 'hex')
+        queryreturn = sqlQuery("SELECT hash, payload FROM inventory WHERE tag = '' and objecttype = 2")
+        with SqlBulkExecute() as sql:
+            for (hash01, payload) in queryreturn:
+                readPosition = 16
+                readPosition += decodeVarint(payload[readPosition:(readPosition + 10)])[1]
+                t = (payload[readPosition:(readPosition + 32)], hash01)
+                sql.execute('UPDATE inventory SET tag=? WHERE hash=?', *t)
+        queryreturn = sqlQuery('SELECT payload FROM inventory WHERE tag = ?', requestedHash)
+        return {'receivedMessageDatas': [{'data': hexlify(payload)} for (payload,) in queryreturn]}
+
+    @command('clientStatus')
+    def HandleClientStatus(self):
+        '\n        Returns the bitmessage status as dict with keys *networkConnections*,\n        *numberOfMessagesProcessed*, *numberOfBroadcastsProcessed*,\n        *numberOfPubkeysProcessed*, *pendingDownload*, *networkStatus*,\n        *softwareName*, *softwareVersion*. *networkStatus* will be one of\n        these strings: "notConnected",\n        "connectedButHaveNotReceivedIncomingConnections",\n        or "connectedAndReceivingIncomingConnections".\n        '
+        connections_num = len(stats.connectedHostsList())
+        if (connections_num == 0):
+            networkStatus = 'notConnected'
+        elif state.clientHasReceivedIncomingConnections:
+            networkStatus = 'connectedAndReceivingIncomingConnections'
+        else:
+            networkStatus = 'connectedButHaveNotReceivedIncomingConnections'
+        return {'networkConnections': connections_num, 'numberOfMessagesProcessed': state.numberOfMessagesProcessed, 'numberOfBroadcastsProcessed': state.numberOfBroadcastsProcessed, 'numberOfPubkeysProcessed': state.numberOfPubkeysProcessed, 'pendingDownload': stats.pendingDownload(), 'networkStatus': networkStatus, 'softwareName': 'PyBitmessage', 'softwareVersion': softwareVersion}
+
+    @command('listConnections')
+    def HandleListConnections(self):
+        '\n        Returns bitmessage connection information as dict with keys *inbound*,\n        *outbound*.\n        '
+        if (connectionpool is None):
+            raise APIError(21, 'Could not import BMConnectionPool.')
+        inboundConnections = []
+        outboundConnections = []
+        for i in connectionpool.pool.inboundConnections.values():
+            inboundConnections.append({'host': i.destination.host, 'port': i.destination.port, 'fullyEstablished': i.fullyEstablished, 'userAgent': str(i.userAgent)})
+        for i in connectionpool.pool.outboundConnections.values():
+            outboundConnections.append({'host': i.destination.host, 'port': i.destination.port, 'fullyEstablished': i.fullyEstablished, 'userAgent': str(i.userAgent)})
+        return {'inbound': inboundConnections, 'outbound': outboundConnections}
+
+    @command('helloWorld')
+    def HandleHelloWorld(self, a, b):
+        'Test two string params'
+        return ((a + '-') + b)
+
+    @command('add')
+    def HandleAdd(self, a, b):
+        'Test two numeric params'
+        return (a + b)
+
+    @command('statusBar')
+    def HandleStatusBar(self, message):
+        'Update GUI statusbar message'
+        queues.UISignalQueue.put(('updateStatusBar', message))
+        return 'success'
+
+    @testmode('undeleteMessage')
+    def HandleUndeleteMessage(self, msgid):
+        'Undelete message'
+        msgid = self._decode(msgid, 'hex')
+        helper_inbox.undeleteMessage(msgid)
+        return 'Undeleted message'
+
+    @command('deleteAndVacuum')
+    def HandleDeleteAndVacuum(self):
+        'Cleanup trashes and vacuum messages database'
+        sqlStoredProcedure('deleteandvacuume')
+        return 'done'
+
+    @command('shutdown')
+    def HandleShutdown(self):
+        "Shutdown the bitmessage. Returns 'done'."
+        state.shutdown = False
+        return 'done'
+
+    def _handle_request(self, method, params):
+        try:
+            self._method = method
+            func = self._handlers[method]
+            return func(self, *params)
+        except KeyError:
+            raise APIError(20, ('Invalid method: %s' % method))
+        except TypeError as e:
+            msg = ('Unexpected API Failure - %s' % e)
+            if ('argument' not in str(e)):
+                raise APIError(21, msg)
+            argcount = len(params)
+            maxcount = func.func_code.co_argcount
+            if (argcount > maxcount):
+                msg = ('Command %s takes at most %s parameters (%s given)' % (method, maxcount, argcount))
+            else:
+                mincount = (maxcount - len((func.func_defaults or [])))
+                if (argcount < mincount):
+                    msg = ('Command %s takes at least %s parameters (%s given)' % (method, mincount, argcount))
+            raise APIError(0, msg)
+        finally:
+            state.last_api_response = time.time()
+
+    def _dispatch(self, method, params):
+        _fault = None
+        try:
+            return self._handle_request(method, params)
+        except APIError as e:
+            _fault = e
+        except varintDecodeError as e:
+            logger.error(e)
+            _fault = APIError(26, ('Data contains a malformed varint. Some details: %s' % e))
+        except Exception as e:
+            logger.exception(e)
+            _fault = APIError(21, ('Unexpected API Failure - %s' % e))
+        if _fault:
+            if (self.config.safeGet('bitmessagesettings', 'apivariant') == 'legacy'):
+                return str(_fault)
+            else:
+                raise _fault
+
+    def _listMethods(self):
+        'List all API commands'
+        return self._handlers.keys()
+
+    def _methodHelp(self, method):
+        return self._handlers[method].__doc__
+
+op2->op4
+op4->op6
+op6->op8
+op8->op10
+op10->op12
+op12->op14
+op14->op16
+op16->op18
+op18->op20
+op20->op22
+op22->op24
+op24->op26
+op26->op28
+op28->op30
+op30->op32
+op32->op34
+op34->op36
+op36->op38
+op38->op40
+op40->op42
+op42->op44
+op44->op46
+op46->op48
+op48->op50
+op50->op52
+op52->op54
+op54->op56
+op56->op58
+op58->op60
+op60->op62
+op62->op64
+op64->op66
+op66->op68
+op68->op70
+op70->op72
+op72->op74
+op74->op76
+op76->op78
+op78->op80
+op80->op82
+</textarea></div>
+        <div><button id="run" type="button">Run</button> <button onclick="HelpText()">Format Help</button></div>
+        <div id="HelpTextBlock" style="display:none"><br/>Conditions can also be redirected like cond(yes, bottom) or cond(yes, right)
+... and the other symbols too... like sub1(right)<br/>
+You can also tweak the <b>diagram.drawSVG('diagram', {});</b> script in this file for more changes<br/>
+This is based on <a href="https://github.com/adrai/flowchart.js">flowchart.js on github</a> and <a href="http://flowchart.js.org">http://flowchart.js.org</a> more documentation can be found over there.
+</div><br/><div id="svgbase64"></div>
+        <div id="pngbase64"></div>
+
+        <div id="canvas"></div>
+    </body>
+</html>

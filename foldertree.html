@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <title>foldertree.html</title>
+        <style type="text/css">
+          .end-element { fill : #FFCCFF; }
+        </style>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/raphael/2.3.0/raphael.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/flowchart/1.17.1/flowchart.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.1/js/bootstrap.bundle.min.js"></script>
+        <!-- <script src="../release/flowchart.min.js"></script> -->
+        <script>
+
+            window.onload = function () {
+                var btn = document.getElementById("run"),
+                    cd = document.getElementById("code"),
+                    chart;
+                    
+                (btn.onclick = function () {
+                    var code = cd.value;
+
+                    if (chart) {
+                      chart.clean();
+                    }
+
+                    chart = flowchart.parse(code);
+                    chart.drawSVG('canvas', {
+                      'x': 0,
+                      'y': 0,
+                      'line-width': 3,
+                      //'maxWidth': 15,//ensures the flowcharts fits within a certain width
+                      'line-length': 50,
+                      'text-margin': 10,
+                      'font-size': 14,
+                      'font': 'normal',
+                      'font-family': 'Helvetica',
+                      'font-weight': 'normal',
+                      'font-color': 'black',
+                      'line-color': 'black',
+                      'element-color': 'black',
+                      'fill': 'white',
+                      'yes-text': 'yes',
+                      'no-text': 'no',
+                      'arrow-end': 'block',
+                      'scale': 1,
+                      'symbols': {
+                        'start': {
+                          'font-size': 14,
+                          'font-color': 'yellow',
+                          'element-color': 'blue',
+                          'fill': 'green',
+                          'class': 'start-element'
+                        },
+                        'inputoutput': {
+                          'font-color': 'black',
+                          'element-color': 'black',
+                          'fill': 'bisque'
+                        },
+                        'operation': {
+                          'font-color': 'black',
+                          'element-color': 'black',
+                          'fill': 'linen'
+                        },
+                        'subroutine': {
+                          'font-color': 'black',
+                          'element-color': 'blue',
+                          'fill': 'lightgreen'
+                        },
+                        'condition': {
+                          'font-color': 'red',
+                          'element-color': 'black',
+                          'fill': 'yellow'
+                        },
+                        'end':{
+                          'font-size': 20,
+                          'class': 'end-element'
+                        }
+                      },
+                      'flowstate' : {
+                        //'past' : { 'fill' : '#CCCCCC', 'font-size' : 12},
+                        //'current' : {'fill' : 'yellow', 'font-color' : 'red', 'font-weight' : 'bold'},
+                        //'future' : { 'fill' : '#FFFF99'},
+                        'request' : { 'fill' : 'blue'},
+                        'invalid': {'fill' : '#444444'},
+                        'approved' : { 'fill' : '#58C4A3', 'font-size' : 12, 'yes-text' : 'APPROVED', 'no-text' : 'n/a' },
+                        'rejected' : { 'fill' : '#C45879', 'font-size' : 12, 'yes-text' : 'n/a', 'no-text' : 'REJECTED' }
+                      }
+                    });
+                    //create base64 encoding of SVG to generate download link for title(without html or htm).SVG
+                    var currentCanvasDIV = document.getElementById('canvas')
+                    var currentDrawSVG = currentCanvasDIV.innerHTML.replaceAll('ë','e');
+
+                    const OUTsvgBASE64 = btoa(currentDrawSVG)
+                    doctitle = document.title.replace('.html','');
+                    doctitle = doctitle.replace('.htm','');
+
+
+                    var currentCanvasDIV = document.getElementById('canvas')
+                    var currentDrawSVG = currentCanvasDIV.innerHTML.replaceAll('ë','e');
+                    svgSource = currentDrawSVG
+                    svgXML = currentDrawSVG;
+                    // Use SVG Height and Width from the SVG XML to set canvas size
+                    svgXMLsubstringHeight = svgXML.substring(svgXML.indexOf('height='), svgXML.indexOf('version='));
+                    svgXMLsubstringWidth = svgXML.substring(svgXML.indexOf('width='), svgXML.indexOf('xmlns='));
+                    HeightValue = svgXMLsubstringHeight.substring(svgXMLsubstringHeight.indexOf('"')+1,svgXMLsubstringHeight.lastIndexOf('"'));
+                    WidthValue = svgXMLsubstringWidth.substring(svgXMLsubstringWidth.indexOf('"')+1,svgXMLsubstringWidth.lastIndexOf('"'));
+                    HeightValueInt = Math.round(HeightValue)
+                    WidthValueInt = Math.round(WidthValue)
+                    // setup input for base64SvgToBase64Png
+                    let svgSrc = "data:image/svg+xml;base64,"+OUTsvgBASE64;
+                    var pngBase
+                    imageUtil.base64SvgToBase64Png(svgSrc, WidthValueInt, HeightValueInt).then(pngSrc => {
+                    pngBase = pngSrc
+                    // output download link for base64 PNG converted on download from base64
+                    var pngOutHtml = `<a href="${pngBase}" download="${doctitle}.png">PNG - Click here to download current rendered flowchart as ${doctitle}.png</a>`
+                    document.getElementById("pngbase64").innerHTML=pngOutHtml;
+                    });    
+                    // output download link for base64 SVG converted on download from base64
+                    var svgOutHtml = `<a href="data:image/svg+xml;base64,${OUTsvgBASE64}" download=${doctitle}.svg>SVG - Click here to download current rendered flowchart as ${doctitle}.svg</a> `
+                        document.getElementById("svgbase64").innerHTML=svgOutHtml;
+                    })();
+
+                            };
+                 
+
+// derived from https://stackoverflow.com/a/64800570
+// we need to use web browser canvas to generate a image. In this case png
+let imageUtil = {};
+/**
+ * converts a base64 encoded data url SVG image to a PNG image
+ * @param originalBase64 data url of svg image
+ * @param width target width in pixel of PNG image
+ * @param secondTry used internally to prevent endless recursion
+ * @return {Promise<unknown>} resolves to png data url of the image
+ */
+imageUtil.base64SvgToBase64Png = function (originalBase64, width, height, secondTry) {
+    return new Promise(resolve => {
+        let img = document.createElement('img');
+        img.onload = function () {
+            if (!secondTry && (img.naturalWidth === 0 || img.naturalHeight === 0)) {
+                let svgDoc = base64ToSvgDocument(originalBase64);
+                let fixedDoc = fixSvgDocumentFF(svgDoc);
+                return imageUtil.base64SvgToBase64Png(svgDocumentToBase64(fixedDoc), width, height, true).then(result => {
+                    resolve(result);
+                });
+            }
+            //document.body.appendChild(img);
+            let canvas2 = document.createElement("canvas");
+            //document.body.removeChild(img);
+            canvas2.width = width;
+            canvas2.height = height;
+            let ctx = canvas2.getContext("2d");
+            ctx.drawImage(img, 0, 0, canvas2.width, canvas2.height);
+            try {
+                let data = canvas2.toDataURL('image/png');
+                resolve(data);
+            } catch (e) {
+                resolve(null);
+            }
+        };
+        img.src = originalBase64;
+    });
+}
+
+//needed because Firefox doesn't correctly handle SVG with size = 0, see https://bugzilla.mozilla.org/show_bug.cgi?id=700533
+function fixSvgDocumentFF(svgDocument) {
+    try {
+        let widthInt = parseInt(svgDocument.documentElement.width.baseVal.value) || 500;
+        let heightInt = parseInt(svgDocument.documentElement.height.baseVal.value) || 500;
+        svgDocument.documentElement.width.baseVal.newValueSpecifiedUnits(SVGLength.SVG_LENGTHTYPE_PX, widthInt);
+        svgDocument.documentElement.height.baseVal.newValueSpecifiedUnits(SVGLength.SVG_LENGTHTYPE_PX, heightInt);
+        return svgDocument;
+    } catch (e) {
+        return svgDocument;
+    }
+}
+
+function svgDocumentToBase64(svgDocument) {
+    try {
+        let base64EncodedSVG = btoa(new XMLSerializer().serializeToString(svgDocument));
+        return 'data:image/svg+xml;base64,' + base64EncodedSVG;
+    } catch (e) {
+        return null;
+    }
+}
+
+function base64ToSvgDocument(base64) {
+    let svg = atob(base64.substring(base64.indexOf('base64,') + 7));
+    svg = svg.substring(svg.indexOf('<svg'));
+    let parser = new DOMParser();
+    return parser.parseFromString(svg, "image/svg+xml");
+} 
+        </script>
+
+        <script>
+            function HelpText() {
+              var x = document.getElementById("HelpTextBlock");
+              if (x.style.display === "none") {
+                x.style.display = "block";
+              } else {
+                x.style.display = "none";
+              }
+            }
+        </script>
+    </head>
+    <body>
+        <div><textarea id="code" style="width: 100%;" rows="11">op2=>operation: '\nFolder tree and messagelist widgets definitions.\n'
+op4=>operation: from cgi import escape
+op6=>operation: from PyQt4 import QtCore, QtGui
+op8=>operation: from bmconfigparser import config
+op10=>operation: from helper_sql import sqlExecute, sqlQuery
+op12=>operation: from settingsmixin import SettingsMixin
+op14=>operation: from tr import _translate
+op16=>operation: from utils import avatarize
+sub18=>subroutine: _translate('MainWindow', 'inbox')
+sub20=>subroutine: _translate('MainWindow', 'new')
+sub22=>subroutine: _translate('MainWindow', 'sent')
+sub24=>subroutine: _translate('MainWindow', 'trash')
+op26=>operation: TimestampRole = (QtCore.Qt.UserRole + 1)
+op28=>operation: class AccountMixin(object):
+    'UI-related functionality for accounts'
+    ALL = 0
+    NORMAL = 1
+    CHAN = 2
+    MAILINGLIST = 3
+    SUBSCRIPTION = 4
+    BROADCAST = 5
+
+    def accountColor(self):
+        'QT UI color for an account'
+        if (not self.isEnabled):
+            return QtGui.QColor(128, 128, 128)
+        elif (self.type == self.CHAN):
+            return QtGui.QColor(216, 119, 0)
+        elif (self.type in [self.MAILINGLIST, self.SUBSCRIPTION]):
+            return QtGui.QColor(137, 4, 177)
+        return QtGui.QApplication.palette().text().color()
+
+    def folderColor(self):
+        'QT UI color for a folder'
+        if (not self.parent().isEnabled):
+            return QtGui.QColor(128, 128, 128)
+        return QtGui.QApplication.palette().text().color()
+
+    def accountBrush(self):
+        'Account brush (for QT UI)'
+        brush = QtGui.QBrush(self.accountColor())
+        brush.setStyle(QtCore.Qt.NoBrush)
+        return brush
+
+    def folderBrush(self):
+        'Folder brush (for QT UI)'
+        brush = QtGui.QBrush(self.folderColor())
+        brush.setStyle(QtCore.Qt.NoBrush)
+        return brush
+
+    def accountString(self):
+        'Account string suitable for use in To: field: label <address>'
+        label = self._getLabel()
+        return (self.address if (label == self.address) else ('%s <%s>' % (label, self.address)))
+
+    def setAddress(self, address):
+        'Set bitmessage address of the object'
+        if (address is None):
+            self.address = None
+        else:
+            self.address = str(address)
+
+    def setUnreadCount(self, cnt):
+        'Set number of unread messages'
+        try:
+            if (self.unreadCount == int(cnt)):
+                return
+        except AttributeError:
+            pass
+        self.unreadCount = int(cnt)
+        if isinstance(self, QtGui.QTreeWidgetItem):
+            self.emitDataChanged()
+
+    def setEnabled(self, enabled):
+        'Set account enabled (QT UI)'
+        self.isEnabled = enabled
+        try:
+            self.setExpanded(enabled)
+        except AttributeError:
+            pass
+        if isinstance(self, Ui_AddressWidget):
+            for i in range(self.childCount()):
+                if isinstance(self.child(i), Ui_FolderWidget):
+                    self.child(i).setEnabled(enabled)
+        if isinstance(self, QtGui.QTreeWidgetItem):
+            self.emitDataChanged()
+
+    def setType(self):
+        'Set account type (QT UI)'
+        self.setFlags((self.flags() | QtCore.Qt.ItemIsEditable))
+        if (self.address is None):
+            self.type = self.ALL
+            self.setFlags((self.flags() & (~ QtCore.Qt.ItemIsEditable)))
+        elif config.safeGetBoolean(self.address, 'chan'):
+            self.type = self.CHAN
+        elif config.safeGetBoolean(self.address, 'mailinglist'):
+            self.type = self.MAILINGLIST
+        elif sqlQuery('select label from subscriptions where address=?', self.address):
+            self.type = AccountMixin.SUBSCRIPTION
+        else:
+            self.type = self.NORMAL
+
+    def defaultLabel(self):
+        'Default label (in case no label is set manually)'
+        queryreturn = None
+        retval = None
+        if (self.type in (AccountMixin.NORMAL, AccountMixin.CHAN, AccountMixin.MAILINGLIST)):
+            try:
+                retval = unicode(config.get(self.address, 'label'), 'utf-8')
+            except Exception:
+                queryreturn = sqlQuery('select label from addressbook where address=?', self.address)
+        elif (self.type == AccountMixin.SUBSCRIPTION):
+            queryreturn = sqlQuery('select label from subscriptions where address=?', self.address)
+        if (queryreturn is not None):
+            if (queryreturn != []):
+                for row in queryreturn:
+                    (retval,) = row
+                    retval = unicode(retval, 'utf-8')
+        elif ((self.address is None) or (self.type == AccountMixin.ALL)):
+            return unicode(str(_translate('MainWindow', 'All accounts')), 'utf-8')
+        return (retval or unicode(self.address, 'utf-8'))
+op30=>operation: class BMTreeWidgetItem(QtGui.QTreeWidgetItem, AccountMixin):
+    'A common abstract class for Tree widget item'
+
+    def __init__(self, parent, pos, address, unreadCount):
+        super(QtGui.QTreeWidgetItem, self).__init__()
+        self.setAddress(address)
+        self.setUnreadCount(unreadCount)
+        self._setup(parent, pos)
+
+    def _getAddressBracket(self, unreadCount=False):
+        return (((' (' + str(self.unreadCount)) + ')') if unreadCount else '')
+
+    def data(self, column, role):
+        'Override internal QT method for returning object data'
+        if (column == 0):
+            if (role == QtCore.Qt.DisplayRole):
+                return (self._getLabel() + self._getAddressBracket((self.unreadCount > 0)))
+            elif (role == QtCore.Qt.EditRole):
+                return self._getLabel()
+            elif (role == QtCore.Qt.ToolTipRole):
+                return (self._getLabel() + self._getAddressBracket(False))
+            elif (role == QtCore.Qt.FontRole):
+                font = QtGui.QFont()
+                font.setBold((self.unreadCount > 0))
+                return font
+        return super(BMTreeWidgetItem, self).data(column, role)
+op32=>operation: class Ui_FolderWidget(BMTreeWidgetItem):
+    'Item in the account/folder tree representing a folder'
+    folderWeight = {'inbox': 1, 'new': 2, 'sent': 3, 'trash': 4}
+
+    def __init__(self, parent, pos=0, address='', folderName='', unreadCount=0):
+        self.setFolderName(folderName)
+        super(Ui_FolderWidget, self).__init__(parent, pos, address, unreadCount)
+
+    def _setup(self, parent, pos):
+        parent.insertChild(pos, self)
+
+    def _getLabel(self):
+        return _translate('MainWindow', self.folderName)
+
+    def setFolderName(self, fname):
+        'Set folder name (for QT UI)'
+        self.folderName = str(fname)
+
+    def data(self, column, role):
+        'Override internal QT method for returning object data'
+        if ((column == 0) and (role == QtCore.Qt.ForegroundRole)):
+            return self.folderBrush()
+        return super(Ui_FolderWidget, self).data(column, role)
+
+    def __lt__(self, other):
+        if isinstance(other, Ui_FolderWidget):
+            if (self.folderName in self.folderWeight):
+                x = self.folderWeight[self.folderName]
+            else:
+                x = 99
+            if (other.folderName in self.folderWeight):
+                y = self.folderWeight[other.folderName]
+            else:
+                y = 99
+            reverse = (QtCore.Qt.DescendingOrder == self.treeWidget().header().sortIndicatorOrder())
+            if (x == y):
+                return (self.folderName < other.folderName)
+            return ((x >= y) if reverse else (x < y))
+        return super(QtGui.QTreeWidgetItem, self).__lt__(other)
+op34=>operation: class Ui_AddressWidget(BMTreeWidgetItem, SettingsMixin):
+    'Item in the account/folder tree representing an account'
+
+    def __init__(self, parent, pos=0, address=None, unreadCount=0, enabled=True):
+        super(Ui_AddressWidget, self).__init__(parent, pos, address, unreadCount)
+        self.setEnabled(enabled)
+
+    def _setup(self, parent, pos):
+        self.setType()
+        parent.insertTopLevelItem(pos, self)
+
+    def _getLabel(self):
+        if (self.address is None):
+            return unicode(_translate('MainWindow', 'All accounts').toUtf8(), 'utf-8', 'ignore')
+        else:
+            try:
+                return unicode(config.get(self.address, 'label'), 'utf-8', 'ignore')
+            except:
+                return unicode(self.address, 'utf-8')
+
+    def _getAddressBracket(self, unreadCount=False):
+        ret = ('' if self.isExpanded() else super(Ui_AddressWidget, self)._getAddressBracket(unreadCount))
+        if (self.address is not None):
+            ret += ((' (' + self.address) + ')')
+        return ret
+
+    def data(self, column, role):
+        'Override internal QT method for returning object data'
+        if (column == 0):
+            if (role == QtCore.Qt.DecorationRole):
+                return avatarize((self.address or self._getLabel().encode('utf8')))
+            elif (role == QtCore.Qt.ForegroundRole):
+                return self.accountBrush()
+        return super(Ui_AddressWidget, self).data(column, role)
+
+    def setData(self, column, role, value):
+        'Save account label (if you edit in the the UI, this will be triggered and will save it to keys.dat)'
+        if ((role == QtCore.Qt.EditRole) and (self.type != AccountMixin.SUBSCRIPTION)):
+            config.set(str(self.address), 'label', (str(value.toString().toUtf8()) if isinstance(value, QtCore.QVariant) else value.encode('utf-8')))
+            config.save()
+        return super(Ui_AddressWidget, self).setData(column, role, value)
+
+    def setAddress(self, address):
+        'Set address to object (for QT UI)'
+        super(Ui_AddressWidget, self).setAddress(address)
+        self.setData(0, QtCore.Qt.UserRole, self.address)
+
+    def _getSortRank(self):
+        return (self.type if self.isEnabled else (self.type + 100))
+
+    def __lt__(self, other):
+        if isinstance(other, Ui_AddressWidget):
+            reverse = (QtCore.Qt.DescendingOrder == self.treeWidget().header().sortIndicatorOrder())
+            if (self._getSortRank() == other._getSortRank()):
+                x = self._getLabel().lower()
+                y = other._getLabel().lower()
+                return (x < y)
+            return ((not reverse) if (self._getSortRank() < other._getSortRank()) else reverse)
+        return super(QtGui.QTreeWidgetItem, self).__lt__(other)
+op36=>operation: class Ui_SubscriptionWidget(Ui_AddressWidget):
+    'Special treating of subscription addresses'
+
+    def __init__(self, parent, pos=0, address='', unreadCount=0, label='', enabled=True):
+        super(Ui_SubscriptionWidget, self).__init__(parent, pos, address, unreadCount, enabled)
+
+    def _getLabel(self):
+        queryreturn = sqlQuery('select label from subscriptions where address=?', self.address)
+        if (queryreturn != []):
+            for row in queryreturn:
+                (retval,) = row
+            return unicode(retval, 'utf-8', 'ignore')
+        return unicode(self.address, 'utf-8')
+
+    def setType(self):
+        'Set account type'
+        super(Ui_SubscriptionWidget, self).setType()
+        self.type = AccountMixin.SUBSCRIPTION
+
+    def setData(self, column, role, value):
+        'Save subscription label to database'
+        if (role == QtCore.Qt.EditRole):
+            if isinstance(value, QtCore.QVariant):
+                label = str(value.toString().toUtf8()).decode('utf-8', 'ignore')
+            else:
+                label = unicode(value, 'utf-8', 'ignore')
+            sqlExecute('UPDATE subscriptions SET label=? WHERE address=?', label, self.address)
+        return super(Ui_SubscriptionWidget, self).setData(column, role, value)
+op38=>operation: class BMTableWidgetItem(QtGui.QTableWidgetItem, SettingsMixin):
+    'A common abstract class for Table widget item'
+
+    def __init__(self, label=None, unread=False):
+        super(QtGui.QTableWidgetItem, self).__init__()
+        self.setLabel(label)
+        self.setUnread(unread)
+        self._setup()
+
+    def _setup(self):
+        self.setFlags((QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled))
+
+    def setLabel(self, label):
+        'Set object label'
+        self.label = label
+
+    def setUnread(self, unread):
+        'Set/unset read state of an item'
+        self.unread = unread
+
+    def data(self, role):
+        'Return object data (QT UI)'
+        if (role in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.ToolTipRole)):
+            return self.label
+        elif (role == QtCore.Qt.FontRole):
+            font = QtGui.QFont()
+            font.setBold(self.unread)
+            return font
+        return super(BMTableWidgetItem, self).data(role)
+op40=>operation: class BMAddressWidget(BMTableWidgetItem, AccountMixin):
+    'A common class for Table widget item with account'
+
+    def _setup(self):
+        super(BMAddressWidget, self)._setup()
+        self.setEnabled(True)
+        self.setType()
+
+    def _getLabel(self):
+        return self.label
+
+    def data(self, role):
+        'Return object data (QT UI)'
+        if (role == QtCore.Qt.ToolTipRole):
+            return (((self.label + ' (') + self.address) + ')')
+        elif (role == QtCore.Qt.DecorationRole):
+            if config.safeGetBoolean('bitmessagesettings', 'useidenticons'):
+                return avatarize((self.address or self.label))
+        elif (role == QtCore.Qt.ForegroundRole):
+            return self.accountBrush()
+        return super(BMAddressWidget, self).data(role)
+op42=>operation: class MessageList_AddressWidget(BMAddressWidget):
+    'Address item in a messagelist'
+
+    def __init__(self, address=None, label=None, unread=False):
+        self.setAddress(address)
+        super(MessageList_AddressWidget, self).__init__(label, unread)
+
+    def setLabel(self, label=None):
+        'Set label'
+        super(MessageList_AddressWidget, self).setLabel(label)
+        if (label is not None):
+            return
+        newLabel = self.address
+        queryreturn = None
+        if (self.type in (AccountMixin.NORMAL, AccountMixin.CHAN, AccountMixin.MAILINGLIST)):
+            try:
+                newLabel = unicode(config.get(self.address, 'label'), 'utf-8', 'ignore')
+            except:
+                queryreturn = sqlQuery('select label from addressbook where address=?', self.address)
+        elif (self.type == AccountMixin.SUBSCRIPTION):
+            queryreturn = sqlQuery('select label from subscriptions where address=?', self.address)
+        if queryreturn:
+            for row in queryreturn:
+                newLabel = unicode(row[0], 'utf-8', 'ignore')
+        self.label = newLabel
+
+    def data(self, role):
+        'Return object data (QT UI)'
+        if (role == QtCore.Qt.UserRole):
+            return self.address
+        return super(MessageList_AddressWidget, self).data(role)
+
+    def setData(self, role, value):
+        'Set object data'
+        if (role == QtCore.Qt.EditRole):
+            self.setLabel()
+        return super(MessageList_AddressWidget, self).setData(role, value)
+
+    def __lt__(self, other):
+        if isinstance(other, MessageList_AddressWidget):
+            return (self.label.lower() < other.label.lower())
+        return super(QtGui.QTableWidgetItem, self).__lt__(other)
+op44=>operation: class MessageList_SubjectWidget(BMTableWidgetItem):
+    'Message list subject item'
+
+    def __init__(self, subject=None, label=None, unread=False):
+        self.setSubject(subject)
+        super(MessageList_SubjectWidget, self).__init__(label, unread)
+
+    def setSubject(self, subject):
+        'Set subject'
+        self.subject = subject
+
+    def data(self, role):
+        'Return object data (QT UI)'
+        if (role == QtCore.Qt.UserRole):
+            return self.subject
+        if (role == QtCore.Qt.ToolTipRole):
+            return escape(unicode(self.subject, 'utf-8'))
+        return super(MessageList_SubjectWidget, self).data(role)
+
+    def __lt__(self, other):
+        if isinstance(other, MessageList_SubjectWidget):
+            return (self.label.lower() < other.label.lower())
+        return super(QtGui.QTableWidgetItem, self).__lt__(other)
+op46=>operation: class MessageList_TimeWidget(BMTableWidgetItem):
+    "\n    A subclass of QTableWidgetItem for received (lastactiontime) field.\n    '<' operator is overloaded to sort by TimestampRole == 33\n    msgid is available by QtCore.Qt.UserRole\n    "
+
+    def __init__(self, label=None, unread=False, timestamp=None, msgid=''):
+        super(MessageList_TimeWidget, self).__init__(label, unread)
+        self.setData(QtCore.Qt.UserRole, QtCore.QByteArray(msgid))
+        self.setData(TimestampRole, int(timestamp))
+
+    def __lt__(self, other):
+        return (self.data(TimestampRole) < other.data(TimestampRole))
+
+    def data(self, role=QtCore.Qt.UserRole):
+        '\n        Returns expected python types for QtCore.Qt.UserRole and TimestampRole\n        custom roles and super for any Qt role\n        '
+        data = super(MessageList_TimeWidget, self).data(role)
+        if (role == TimestampRole):
+            return int(data.toPyObject())
+        if (role == QtCore.Qt.UserRole):
+            return str(data.toPyObject())
+        return data
+op48=>operation: class Ui_AddressBookWidgetItem(BMAddressWidget):
+    'Addressbook item'
+
+    def __init__(self, label=None, acc_type=AccountMixin.NORMAL):
+        self.type = acc_type
+        super(Ui_AddressBookWidgetItem, self).__init__(label=label)
+
+    def data(self, role):
+        'Return object data'
+        if (role == QtCore.Qt.UserRole):
+            return self.type
+        return super(Ui_AddressBookWidgetItem, self).data(role)
+
+    def setData(self, role, value):
+        'Set data'
+        if (role == QtCore.Qt.EditRole):
+            self.label = str((value.toString().toUtf8() if isinstance(value, QtCore.QVariant) else value))
+            if (self.type in (AccountMixin.NORMAL, AccountMixin.MAILINGLIST, AccountMixin.CHAN)):
+                try:
+                    config.get(self.address, 'label')
+                    config.set(self.address, 'label', self.label)
+                    config.save()
+                except:
+                    sqlExecute('UPDATE addressbook set label=? WHERE address=?', self.label, self.address)
+            elif (self.type == AccountMixin.SUBSCRIPTION):
+                sqlExecute('UPDATE subscriptions set label=? WHERE address=?', self.label, self.address)
+            else:
+                pass
+        return super(Ui_AddressBookWidgetItem, self).setData(role, value)
+
+    def __lt__(self, other):
+        if isinstance(other, Ui_AddressBookWidgetItem):
+            reverse = (QtCore.Qt.DescendingOrder == self.tableWidget().horizontalHeader().sortIndicatorOrder())
+            if (self.type == other.type):
+                return (self.label.lower() < other.label.lower())
+            return ((not reverse) if (self.type < other.type) else reverse)
+        return super(QtGui.QTableWidgetItem, self).__lt__(other)
+op50=>operation: class Ui_AddressBookWidgetItemLabel(Ui_AddressBookWidgetItem):
+    'Addressbook label item'
+
+    def __init__(self, address, label, acc_type):
+        self.address = address
+        super(Ui_AddressBookWidgetItemLabel, self).__init__(label, acc_type)
+
+    def data(self, role):
+        'Return object data'
+        self.label = self.defaultLabel()
+        return super(Ui_AddressBookWidgetItemLabel, self).data(role)
+op52=>operation: class Ui_AddressBookWidgetItemAddress(Ui_AddressBookWidgetItem):
+    'Addressbook address item'
+
+    def __init__(self, address, label, acc_type):
+        self.address = address
+        super(Ui_AddressBookWidgetItemAddress, self).__init__(address, acc_type)
+
+    def data(self, role):
+        'Return object data'
+        if (role == QtCore.Qt.ToolTipRole):
+            return self.address
+        if (role == QtCore.Qt.DecorationRole):
+            return None
+        return super(Ui_AddressBookWidgetItemAddress, self).data(role)
+op54=>operation: class AddressBookCompleter(QtGui.QCompleter):
+    'Addressbook completer'
+
+    def __init__(self):
+        super(AddressBookCompleter, self).__init__()
+        self.cursorPos = (- 1)
+
+    def onCursorPositionChanged(self, oldPos, newPos):
+        'Callback for cursor position change'
+        if (oldPos != self.cursorPos):
+            self.cursorPos = (- 1)
+
+    def splitPath(self, path):
+        'Split on semicolon'
+        text = unicode(path.toUtf8(), 'utf-8')
+        return [text[:self.widget().cursorPosition()].split(';')[(- 1)].strip()]
+
+    def pathFromIndex(self, index):
+        'Perform autocompletion (reimplemented QCompleter method)'
+        autoString = unicode(index.data(QtCore.Qt.EditRole).toString().toUtf8(), 'utf-8')
+        text = unicode(self.widget().text().toUtf8(), 'utf-8')
+        if (self.cursorPos != (- 1)):
+            self.widget().setCursorPosition(self.cursorPos)
+        else:
+            self.cursorPos = self.widget().cursorPosition()
+        curIndex = self.widget().cursorPosition()
+        prevDelimiterIndex = text[0:curIndex].rfind(';')
+        while (text[(prevDelimiterIndex + 1)] == ' '):
+            prevDelimiterIndex += 1
+        nextDelimiterIndex = text.find(';', curIndex)
+        if (nextDelimiterIndex == (- 1)):
+            nextDelimiterIndex = len(text)
+        part1 = text[0:(prevDelimiterIndex + 1)]
+        part2 = text[nextDelimiterIndex:]
+        return ((part1 + autoString) + part2)
+
+op2->op4
+op4->op6
+op6->op8
+op8->op10
+op10->op12
+op12->op14
+op14->op16
+op16->sub18
+sub18->sub20
+sub20->sub22
+sub22->sub24
+sub24->op26
+op26->op28
+op28->op30
+op30->op32
+op32->op34
+op34->op36
+op36->op38
+op38->op40
+op40->op42
+op42->op44
+op44->op46
+op46->op48
+op48->op50
+op50->op52
+op52->op54
+</textarea></div>
+        <div><button id="run" type="button">Run</button> <button onclick="HelpText()">Format Help</button></div>
+        <div id="HelpTextBlock" style="display:none"><br/>Conditions can also be redirected like cond(yes, bottom) or cond(yes, right)
+... and the other symbols too... like sub1(right)<br/>
+You can also tweak the <b>diagram.drawSVG('diagram', {});</b> script in this file for more changes<br/>
+This is based on <a href="https://github.com/adrai/flowchart.js">flowchart.js on github</a> and <a href="http://flowchart.js.org">http://flowchart.js.org</a> more documentation can be found over there.
+</div><br/><div id="svgbase64"></div>
+        <div id="pngbase64"></div>
+
+        <div id="canvas"></div>
+    </body>
+</html>
